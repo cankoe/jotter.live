@@ -53,6 +53,7 @@ export function applySettings(settings: SettingsValues): void {
 
 export interface SettingsPanelOptions {
   onExportWorkspace: () => void;
+  onImportWorkspace: (file: File) => void;
   onClearAllData: () => void;
   onShowWelcome: () => void;
   onSettingsChange: (settings: SettingsValues) => void;
@@ -138,9 +139,16 @@ export class SettingsPanel {
 
     body.appendChild(this.actionRow(
       "Export workspace",
-      "Download all notes and files as a .zip",
+      "Download all notes, files, and settings as a .zip",
       "Export",
       () => { this.options.onExportWorkspace(); this.close(); }
+    ));
+
+    body.appendChild(this.actionRow(
+      "Import workspace",
+      "Restore from a .zip export (additive — keeps existing notes)",
+      "Import",
+      () => { this.openImportPicker(); }
     ));
 
     body.appendChild(this.actionRow(
@@ -292,6 +300,19 @@ export class SettingsPanel {
 
     row.append(info, btn);
     return row;
+  }
+
+  private openImportPicker(): void {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip";
+    input.addEventListener("change", () => {
+      if (input.files && input.files[0]) {
+        this.options.onImportWorkspace(input.files[0]);
+        this.close();
+      }
+    });
+    input.click();
   }
 
   private save(): void {

@@ -41,6 +41,7 @@ export class App {
 
     this.settingsPanel = new SettingsPanel({
       onExportWorkspace: () => this.exportFullWorkspace(),
+      onImportWorkspace: (file) => this.importFullWorkspace(file),
       onClearAllData: () => this.clearAllData(),
       onShowWelcome: () => this.showLanding(),
       onSettingsChange: () => {},
