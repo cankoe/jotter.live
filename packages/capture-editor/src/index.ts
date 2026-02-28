@@ -42,6 +42,8 @@ export {
   livePreviewPlugin,
   livePreviewTheme,
   setCheckboxToggleCallback,
+  checkboxToggleFacet,
+  tableDecorationField,
 } from "./livePreview";
 
 export {

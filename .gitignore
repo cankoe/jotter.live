@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# IDE / OS
+.DS_Store
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# Test output
+coverage/
+
+# Temp files
+jotter-*.png
+.playwright-mcp/

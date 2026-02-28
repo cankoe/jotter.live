@@ -1,0 +1,11 @@
+/* ── Landing Overlay (JS-controlled) ─────────── */
+/* Base styles are inline in index.html for SEO.   */
+/* This file only adds the entrance animations     */
+/* that play when JS calls .show()                 */
+
+@media (max-width: 640px) {
+  .topbar-title {
+    cursor: pointer;
+    user-select: none;
+  }
+}

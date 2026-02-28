@@ -27,12 +27,16 @@
     "@codemirror/lang-markdown": "^6.3.2",
     "@codemirror/language": "^6.10.8",
     "@codemirror/language-data": "^6.5.1",
+    "@codemirror/search": "^6.6.0",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.5",
     "@lezer/highlight": "^1.2.1",
+    "katex": "^0.16.32",
+    "mermaid": "^11.12.3",
     "turndown": "^7.2.2"
   },
   "devDependencies": {
+    "@types/katex": "^0.16.8",
     "@types/turndown": "^5.0.6",
     "typescript": "^5.9.3"
   },

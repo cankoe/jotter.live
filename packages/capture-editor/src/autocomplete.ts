@@ -11,6 +11,7 @@ import type { CompletionResult, Completion } from "@codemirror/autocomplete";
 import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { MentionContact } from "./types";
+import { emojiMap, emojiEntries } from "./emojiData";
 
 // Mention autocomplete: triggered by @
 function mentionCompletion(contacts: MentionContact[]) {
@@ -133,6 +134,52 @@ function hashtagCompletion(existingTags: string[]) {
   };
 }
 
+// Emoji autocomplete: triggered by :, Slack-style (emoji on left, :shortcode: label)
+function emojiCompletion() {
+  return async (context: CompletionContext): Promise<CompletionResult | null> => {
+    const beforeCursor = context.state.sliceDoc(
+      Math.max(0, context.pos - 40),
+      context.pos
+    );
+
+    // Match :shortcode pattern — allow at start of line or after whitespace/punctuation
+    const match = beforeCursor.match(/(?:^|[\s(,;])(:([a-z0-9_+\-]*))$/);
+    if (!match) return null;
+
+    const query = match[2].toLowerCase();
+    // from includes the colon
+    const from = context.pos - match[1].length;
+
+    // Prioritize: prefix matches first, then substring matches
+    const prefixMatches: [string, string][] = [];
+    const substringMatches: [string, string][] = [];
+    for (const [code, emoji] of emojiEntries) {
+      if (code.startsWith(query)) prefixMatches.push([code, emoji]);
+      else if (code.includes(query)) substringMatches.push([code, emoji]);
+    }
+    const filtered = [...prefixMatches, ...substringMatches].slice(0, 16);
+
+    const options: Completion[] = filtered.map(([code, emoji]) => ({
+      label: `:${code}:`,
+      displayLabel: `:${code}:`,
+      type: "emoji",
+      detail: emoji,   // stored for addToOptions renderer
+      apply: (view, _completion, from, to) => {
+        view.dispatch({
+          changes: { from, to, insert: emoji },
+          selection: { anchor: from + emoji.length },
+        });
+      },
+    }));
+
+    return {
+      from,
+      options,
+      validFor: /^:[a-z0-9_+\-]*$/,
+    };
+  };
+}
+
 // Create the autocomplete extension
 export function createCaptureAutocomplete(
   contacts: MentionContact[] = [],
@@ -142,14 +189,31 @@ export function createCaptureAutocomplete(
     override: [
       mentionCompletion(contacts),
       hashtagCompletion(existingTags),
+      emojiCompletion(),
     ],
     defaultKeymap: true,
     closeOnBlur: true,
     icons: false,
+    addToOptions: [
+      {
+        // Render emoji character on the left side of each emoji option
+        render(completion: Completion): Node | null {
+          if (completion.type !== "emoji" || !completion.detail) return null;
+          const span = document.createElement("span");
+          span.className = "cm-autocomplete-emoji-icon";
+          span.textContent = completion.detail;
+          return span;
+        },
+        position: 20, // before label (label is at 50)
+      },
+    ],
     optionClass: (completion) => {
       if (completion.detail === "New contact (stub)" ||
-          completion.detail === "New tag") {
+        completion.detail === "New tag") {
         return "cm-autocomplete-create";
+      }
+      if (completion.type === "emoji") {
+        return "cm-autocomplete-emoji";
       }
       return "";
     },
@@ -179,6 +243,34 @@ export const autocompleteTheme = EditorView.theme({
   },
   ".cm-autocomplete-create .cm-completionLabel": {
     color: "var(--accent, #3b82f6)",
+  },
+  // Emoji picker — Slack style
+  ".cm-autocomplete-emoji": {
+    display: "flex",
+    alignItems: "center",
+    gap: "0",
+  },
+  ".cm-autocomplete-emoji .cm-completionDetail": {
+    // Hide the raw emoji character in detail (it's shown via the icon span)
+    display: "none",
+  },
+  ".cm-autocomplete-emoji .cm-completionLabel": {
+    color: "var(--text-muted, #9ca3af)",
+    fontFamily: "monospace",
+    fontSize: "0.9em",
+  },
+  ".cm-autocomplete-emoji .cm-completionMatchedText": {
+    color: "var(--text-primary, #fff)",
+    fontWeight: "bold",
+    textDecoration: "none",
+  },
+  ".cm-autocomplete-emoji-icon": {
+    fontSize: "1.4em",
+    lineHeight: "1",
+    marginRight: "0.5em",
+    flexShrink: "0",
+    width: "1.6em",
+    textAlign: "center",
   },
 });
 
