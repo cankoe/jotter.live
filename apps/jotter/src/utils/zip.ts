@@ -146,7 +146,9 @@ export async function exportWorkspace(
     while (notesFolder.file(filename)) {
       filename = `${safeName}-${counter++}.md`;
     }
-    notesFolder.file(filename, note.content);
+    // Rewrite jotter-file:// to relative files/ paths for portability
+    const exportContent = note.content.replace(JOTTER_FILE_RE, (_, fname) => `files/${fname}`);
+    notesFolder.file(filename, exportContent);
   }
 
   // All files from the store
@@ -185,7 +187,9 @@ export async function importWorkspace(file: File): Promise<{
     for (const [path, entry] of Object.entries(zip.files)) {
       if (path.startsWith("notes/") && path.endsWith(".md") && !entry.dir) {
         const text = await entry.async("text");
-        notes.push({ title: deriveTitle(text), content: text });
+        // Rewrite relative files/ paths back to jotter-file://
+        const content = text.replace(/files\/([^\s)]+)/g, "jotter-file://$1");
+        notes.push({ title: deriveTitle(content), content });
       }
       if (path.startsWith("files/") && !entry.dir) {
         const name = path.replace("files/", "");
