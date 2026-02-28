@@ -310,10 +310,12 @@ export class EditorPane {
     if (!this.editor) return;
     const view = this.editor.getEditorView();
     const { from, to } = view.state.selection.main;
+    const insert = text + "\n";
     view.dispatch({
-      changes: { from, to, insert: text },
-      selection: { anchor: from + text.length },
+      changes: { from, to, insert },
+      selection: { anchor: from + insert.length },
     });
+    this.editor.focus();
   }
 
   destroy(): void {

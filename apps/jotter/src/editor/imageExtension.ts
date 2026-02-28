@@ -161,19 +161,28 @@ function buildFileDecorations(view: EditorView, resolver: FileResolver): Decorat
 
 export function createImageRenderExtension(store: ImageStore) {
   const resolver = new FileResolver(store);
-  return ViewPlugin.fromClass(
-    class {
-      decorations: DecorationSet;
-      constructor(view: EditorView) { this.decorations = buildFileDecorations(view, resolver); }
-      update(update: ViewUpdate): void {
-        if (update.docChanged || update.selectionSet) {
-          this.decorations = buildFileDecorations(update.view, resolver);
-        }
+
+  class FileDecoPlugin {
+    decorations: DecorationSet;
+    private _view: EditorView;
+
+    constructor(view: EditorView) {
+      this._view = view;
+      this.decorations = buildFileDecorations(view, resolver);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        this.decorations = buildFileDecorations(update.view, resolver);
       }
-      destroy(): void { resolver.revokeAll(); }
-    },
-    { decorations: (v) => v.decorations }
-  );
+    }
+
+    destroy() { resolver.revokeAll(); }
+  }
+
+  return ViewPlugin.fromClass(FileDecoPlugin, {
+    decorations: (v) => v.decorations,
+  });
 }
 
 export function createImagePasteHandler(store: ImageStore) {
