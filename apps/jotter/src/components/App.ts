@@ -59,6 +59,7 @@ export class App {
     this.sidebar = new Sidebar({
       onNoteSelect: (id) => this.selectNote(id),
       onNoteActionClick: (id, e) => this.showNoteContextMenu(id, e),
+      onNewNote: () => this.createNewNote(),
       onTrashClick: () => this.showTrash(),
     });
 

@@ -85,6 +85,29 @@
 
 .sidebar-search {
   padding: 8px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.sidebar-new-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sidebar-new-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 .sidebar-search input {

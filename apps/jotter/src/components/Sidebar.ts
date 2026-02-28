@@ -6,6 +6,7 @@ import { createNoteItem } from "./NoteItem";
 export interface SidebarOptions {
   onNoteSelect: (id: string) => void;
   onNoteActionClick: (id: string, e: MouseEvent) => void;
+  onNewNote: () => void;
   onTrashClick: () => void;
 }
 
@@ -39,7 +40,12 @@ export class Sidebar {
       this.searchQuery = this.searchInput.value;
       this.render();
     });
-    this.searchWrap.appendChild(this.searchInput);
+    const newBtn = document.createElement("button");
+    newBtn.className = "sidebar-new-btn";
+    newBtn.title = "New note";
+    newBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
+    newBtn.addEventListener("click", options.onNewNote);
+    this.searchWrap.append(this.searchInput, newBtn);
 
     this.backEl = document.createElement("div");
     this.backEl.className = "sidebar-back";

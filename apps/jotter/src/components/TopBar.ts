@@ -26,11 +26,10 @@ export class TopBar {
     titleWrap.textContent = "Jotter";
     titleWrap.addEventListener("click", options.onToggleSidebar);
 
-    const newBtn = this.createBtn(ICON_PLUS, "New note", options.onNewNote);
     const attachBtn = this.createBtn(ICON_PAPERCLIP, "Toggle attachments", options.onToggleAttachments);
     const settingsBtn = this.createBtn(ICON_SETTINGS, "Settings", options.onShowSettings);
 
-    this.el.append(titleWrap, newBtn, attachBtn, settingsBtn);
+    this.el.append(titleWrap, attachBtn, settingsBtn);
   }
 
   private createBtn(iconHtml: string, title: string, onClick: () => void): HTMLButtonElement {
