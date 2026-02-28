@@ -512,6 +512,7 @@ export class App {
       if (result.notesDeleted) parts.push(`${result.notesDeleted} deleted`);
       const summary = parts.length > 0 ? parts.join(", ") : "Already up to date";
       showToast({ message: `Sync complete: ${summary}` });
+      this.settingsPanel.render();
       // Refresh the note list in case new notes were pulled
       if (result.notesDownloaded > 0 || result.filesDownloaded > 0) {
         await this.refreshNoteList();

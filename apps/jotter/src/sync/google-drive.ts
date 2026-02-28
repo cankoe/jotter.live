@@ -10,7 +10,9 @@ export interface DriveFile {
   modifiedTime: string;
 }
 
-let cachedFolderId: string | null = null;
+const FOLDER_KEY = "jotter-gdrive-folder";
+
+let cachedFolderId: string | null = localStorage.getItem(FOLDER_KEY);
 let cachedNotesFolderId: string | null = null;
 let cachedFilesFolderId: string | null = null;
 
@@ -89,6 +91,7 @@ export async function ensureJotterFolder(): Promise<{ rootId: string; notesId: s
   cachedFolderId = rootId;
   cachedNotesFolderId = notesId;
   cachedFilesFolderId = filesId;
+  localStorage.setItem(FOLDER_KEY, rootId);
 
   return { rootId, notesId, filesId };
 }
@@ -198,4 +201,5 @@ export function clearFolderCache(): void {
   cachedFolderId = null;
   cachedNotesFolderId = null;
   cachedFilesFolderId = null;
+  localStorage.removeItem(FOLDER_KEY);
 }
