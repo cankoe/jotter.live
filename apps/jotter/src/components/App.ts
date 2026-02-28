@@ -53,8 +53,9 @@ export class App {
       onSettingsChange: () => {},
       onConnectDrive: () => {
         signIn().then(() => {
-          showToast({ message: "Google Drive connected" });
+          showToast({ message: "Google Drive connected — syncing..." });
           this.settingsPanel.render();
+          this.syncNow();
         }).catch((err) => {
           console.error("Drive sign-in failed:", err);
           showToast({ message: "Failed to connect Google Drive" });
