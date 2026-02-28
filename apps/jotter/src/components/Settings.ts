@@ -91,6 +91,7 @@ export interface SettingsValues {
   editorMaxWidth: number;
   trashRetentionDays: number;
   showToolbar: boolean;
+  autoSync: boolean;
 }
 
 const DEFAULTS: SettingsValues = {
@@ -100,9 +101,21 @@ const DEFAULTS: SettingsValues = {
   editorMaxWidth: 720,
   trashRetentionDays: 30,
   showToolbar: true,
+  autoSync: false,
 };
 
 const STORAGE_KEY = "jotter-settings";
+
+function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export function loadSettings(): SettingsValues {
   try {
@@ -142,6 +155,11 @@ export interface SettingsPanelOptions {
   onShowWelcome: () => void;
   onCreateNote: (content: string) => void;
   onSettingsChange: (settings: SettingsValues) => void;
+  onConnectDrive: () => void;
+  onDisconnectDrive: () => void;
+  onSyncNow: () => void;
+  isDriveConnected: () => boolean;
+  getLastSyncTime: () => number | null;
 }
 
 export class SettingsPanel {
@@ -218,6 +236,10 @@ export class SettingsPanel {
       { value: "365", label: "1 year" },
       { value: "0", label: "Never auto-delete" },
     ]));
+
+    // -- Sync --
+    body.appendChild(this.sectionHeader("Sync"));
+    body.appendChild(this.syncSection());
 
     // -- Data --
     body.appendChild(this.sectionHeader("Data"));
@@ -461,6 +483,48 @@ export class SettingsPanel {
 
     row.append(info, btn);
     return row;
+  }
+
+  private syncSection(): DocumentFragment {
+    const frag = document.createDocumentFragment();
+    const connected = this.options.isDriveConnected();
+
+    if (!connected) {
+      frag.appendChild(this.actionRow(
+        "Google Drive",
+        "Sync your notes and files to Google Drive",
+        "Connect",
+        () => { this.options.onConnectDrive(); },
+      ));
+    } else {
+      // Sync now + last synced
+      const lastSync = this.options.getLastSyncTime();
+      const lastSyncText = lastSync ? formatTimeAgo(lastSync) : "Never";
+
+      frag.appendChild(this.actionRow(
+        "Sync now",
+        `Last synced: ${lastSyncText}`,
+        "Sync",
+        () => { this.options.onSyncNow(); },
+      ));
+
+      // Auto-sync toggle
+      frag.appendChild(this.toggleRow("Auto-sync after saving", "autoSync"));
+
+      // Disconnect
+      frag.appendChild(this.actionRow(
+        "Disconnect Google Drive",
+        "Remove Drive connection (local data is kept)",
+        "Disconnect",
+        () => {
+          this.options.onDisconnectDrive();
+          this.render();
+        },
+        true,
+      ));
+    }
+
+    return frag;
   }
 
   private openImportPicker(): void {

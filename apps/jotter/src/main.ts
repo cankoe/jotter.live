@@ -6,6 +6,10 @@ import "katex/dist/katex.min.css";
 import { App } from "./components/App";
 import { registerSW } from "virtual:pwa-register";
 import { showToast } from "./components/Toast";
+import { handleOAuthRedirect } from "./sync/google-auth";
+
+// Handle OAuth redirect before app init
+await handleOAuthRedirect();
 
 const root = document.getElementById("app")!;
 const app = new App(root);

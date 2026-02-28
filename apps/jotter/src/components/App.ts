@@ -11,6 +11,9 @@ import { exportNotesToZip, importFromZip, exportWorkspace, importWorkspace } fro
 import { LandingOverlay } from "./LandingOverlay";
 import { SettingsPanel, loadSettings, saveSettings, applySettings } from "./Settings";
 import { createWelcomeNote } from "../welcome";
+import { isSignedIn, signIn, signOut } from "../sync/google-auth";
+import { clearFolderCache } from "../sync/google-drive";
+import { syncNotes, getLastSyncTime } from "../sync/sync-engine";
 
 export class App {
   private db: NotesDB;
@@ -29,6 +32,8 @@ export class App {
   private trashedNotes: Note[] = [];
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private sidebarOpen = false;
+  private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private isSyncing = false;
 
   constructor(private root: HTMLElement) {
     this.db = new NotesDB();
@@ -46,6 +51,11 @@ export class App {
       onShowWelcome: () => this.showLanding(),
       onCreateNote: (content) => this.createNoteWithContent(content),
       onSettingsChange: () => {},
+      onConnectDrive: () => signIn(),
+      onDisconnectDrive: () => { signOut(); clearFolderCache(); },
+      onSyncNow: () => this.syncNow(),
+      isDriveConnected: () => isSignedIn(),
+      getLastSyncTime: () => getLastSyncTime(),
     });
 
     this.topBar = new TopBar({
@@ -304,6 +314,7 @@ export class App {
     if (!this.activeNoteId) return;
     await this.db.update(this.activeNoteId, { content });
     await this.refreshNoteList();
+    this.scheduleDebouncedSync();
   }
 
   private showNoteContextMenu(id: string, e: MouseEvent): void {
@@ -468,6 +479,42 @@ export class App {
     const parts = [`${notesAdded} note(s)`, `${result.files.length} file(s)`];
     if (result.settings) parts.push("settings");
     showToast({ message: `Imported ${parts.join(", ")}` });
+  }
+
+  private async syncNow(): Promise<void> {
+    if (this.isSyncing || !isSignedIn()) return;
+    this.isSyncing = true;
+    try {
+      const result = await syncNotes(this.db, this.images);
+      const parts: string[] = [];
+      if (result.notesUploaded) parts.push(`${result.notesUploaded} up`);
+      if (result.notesDownloaded) parts.push(`${result.notesDownloaded} down`);
+      if (result.filesUploaded) parts.push(`${result.filesUploaded} files up`);
+      if (result.filesDownloaded) parts.push(`${result.filesDownloaded} files down`);
+      if (result.notesDeleted) parts.push(`${result.notesDeleted} deleted`);
+      const summary = parts.length > 0 ? parts.join(", ") : "Already up to date";
+      showToast({ message: `Sync complete: ${summary}` });
+      // Refresh the note list in case new notes were pulled
+      if (result.notesDownloaded > 0 || result.filesDownloaded > 0) {
+        await this.refreshNoteList();
+        if (this.attachmentsPane.isOpen()) this.attachmentsPane.refresh();
+      }
+    } catch (err) {
+      console.error("Sync failed:", err);
+      showToast({ message: "Sync failed. Check console for details." });
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  private scheduleDebouncedSync(): void {
+    if (!isSignedIn()) return;
+    const settings = loadSettings();
+    if (!settings.autoSync) return;
+    if (this.syncDebounceTimer) clearTimeout(this.syncDebounceTimer);
+    this.syncDebounceTimer = setTimeout(() => {
+      this.syncNow();
+    }, 10_000);
   }
 
   private setupSidebarDragDrop(): void {
