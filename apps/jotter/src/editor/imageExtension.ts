@@ -156,7 +156,8 @@ function buildFileDecorations(view: EditorView, resolver: FileResolver): Decorat
     }
   }
 
-  return RangeSet.of(decorations);
+  decorations.sort((a, b) => a.from - b.from);
+  return RangeSet.of(decorations, true);
 }
 
 export function createImageRenderExtension(store: ImageStore) {
