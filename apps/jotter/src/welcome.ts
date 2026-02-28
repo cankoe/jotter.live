@@ -133,6 +133,18 @@ This note includes a sample image and file. Open the **Files** panel (paperclip 
 
 [View sample file](jotter-file://readme.txt)
 
+## Google Drive sync
+
+Sync your notes across devices without creating an account:
+
+1. Open **Settings** (gear icon) > **Sync**
+2. Click **Connect Google Drive**
+3. Approve the Google consent screen
+4. Your notes, files, and settings sync directly to your Drive
+
+> [!tip] Your data stays yours
+> Sync goes directly from your browser to Google Drive. Jotter's servers never see your data.
+
 ## More callout types
 
 > [!note] Note

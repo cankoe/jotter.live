@@ -6,15 +6,26 @@ export const PRIVACY_POLICY = `# Privacy Policy
 
 ## The short version
 
-Jotter does not collect, store, or transmit any of your data. Everything stays in your browser.
+Jotter does not collect, store, or transmit any of your data. Everything stays in your browser. When you use Google Drive sync, your data goes directly from your browser to your Google Drive — we never see, proxy, or store it.
 
 ## Data storage
 
-All your notes, files, and settings are stored locally in your browser using IndexedDB and the Origin Private File System (OPFS). No data is sent to any server, including ours.
+All your notes, files, and settings are stored locally in your browser using IndexedDB and the Origin Private File System (OPFS). No data is sent to any Jotter server.
+
+## Google Drive sync
+
+Jotter offers optional sync to Google Drive. When enabled:
+
+- Your notes, files, and settings are synced directly between your browser and your personal Google Drive account
+- The sync connection is a direct OAuth token between your browser and Google — Jotter's servers are never involved
+- We cannot see, access, or read any of your synced data
+- Data is stored in a "Jotter" folder in your Drive that only you and the Jotter app can access (using the \`drive.file\` scope)
+- You can disconnect at any time in Settings > Sync, which revokes the connection but keeps your local data
+- Deleting the Jotter folder from your Drive removes all synced data from Google
 
 ## No accounts
 
-Jotter does not require or offer user accounts. There is no login, no registration, and no user profiles.
+Jotter does not have its own user accounts. Google Drive sync uses your existing Google account via OAuth — we never receive or store your Google password.
 
 ## No analytics or tracking
 
@@ -26,6 +37,7 @@ After the initial page load, Jotter works entirely offline. The only external re
 
 - Google Fonts (Instrument Serif) loaded on the landing page
 - Favicon images from Google's favicon service (for URL preview chips)
+- Google Drive API (only when sync is enabled, goes directly to googleapis.com)
 
 ## Data export
 
@@ -37,7 +49,8 @@ You can delete all your data at any time using **Settings > Data > Clear**. You 
 
 ## Third-party services
 
-Jotter is hosted on Cloudflare. See [Cloudflare's Privacy Policy](https://www.cloudflare.com/privacypolicy/).
+- **Cloudflare** — hosts the static app files. See [Cloudflare's Privacy Policy](https://www.cloudflare.com/privacypolicy/).
+- **Google Drive** — optional sync only. See [Google's Privacy Policy](https://policies.google.com/privacy).
 
 ## Contact
 
@@ -54,7 +67,7 @@ By using Jotter at jotter.live, you agree to these terms.
 
 ## Description of service
 
-Jotter is a free, browser-based notepad. It stores all data locally in your browser. Jotter does not provide cloud storage, backup services, or data synchronization.
+Jotter is a free, browser-based notepad. It stores all data locally in your browser. Optional Google Drive sync allows you to keep your notes in sync across devices — this is a direct connection between your browser and Google, not through Jotter's servers.
 
 ## No warranty
 
@@ -62,7 +75,14 @@ Jotter is provided "as is" without warranty of any kind. We do not guarantee tha
 
 ## Data responsibility
 
-You are solely responsible for your data. We strongly recommend using **Export Workspace** regularly to create backups.
+You are solely responsible for your data. We strongly recommend enabling Google Drive sync or using **Export Workspace** regularly to create backups.
+
+## Google Drive sync
+
+- Sync is optional and requires connecting your Google account
+- Jotter uses the \`drive.file\` scope, which only allows access to files created by Jotter — not your other Drive files
+- Sync goes directly from your browser to Google Drive — Jotter's servers never see your data
+- You can disconnect at any time in Settings
 
 ## Acceptable use
 

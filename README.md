@@ -49,6 +49,7 @@ Jotter is a free, offline-first notepad that lives entirely in your browser. No 
 - **Welcome Note** — First-time users get a comprehensive note demonstrating all features
 
 ### PWA
+- **Google Drive Sync** — Sync notes, files, and settings across devices via your Google account. Direct browser-to-Google connection — Jotter's servers never see your data
 - **Installable** — Works as a standalone app on desktop and mobile
 - **Fully Offline** — After first visit, no internet needed
 - **Update Prompt** — New versions detected with refresh button
@@ -65,6 +66,7 @@ Jotter is a free, offline-first notepad that lives entirely in your browser. No 
 - **KaTeX** — Math rendering
 - **Mermaid** — Diagram rendering
 - **JSZip** — Export/import
+- **Google Drive API** — Optional sync (direct browser-to-Google, no proxy)
 - **Workbox** — Service worker for offline support
 - **Cloudflare Workers** — Hosting with static assets
 
@@ -111,8 +113,10 @@ Everything stays in your browser:
 - Notes stored in **IndexedDB**
 - Files stored in the **Origin Private File System (OPFS)**
 - Settings stored in **localStorage**
-- No data leaves your device — ever
-- No accounts, cookies, analytics, tracking, or servers
+- No data leaves your device unless you enable Google Drive sync
+- Google Drive sync is a direct browser-to-Google connection — Jotter's servers never see, proxy, or store your data
+- No Jotter accounts — Google Drive sync uses your existing Google account via OAuth
+- No cookies, analytics, or tracking
 - Export your full workspace anytime as a ZIP backup
 - Open source — [view the code](https://github.com/cankoe/jotter.live)
 
