@@ -54,12 +54,17 @@ export class App {
       onConnectDrive: () => {
         signIn().then(() => {
           showToast({ message: "Google Drive connected" });
+          this.settingsPanel.render();
         }).catch((err) => {
           console.error("Drive sign-in failed:", err);
           showToast({ message: "Failed to connect Google Drive" });
         });
       },
-      onDisconnectDrive: () => { signOut(); clearFolderCache(); },
+      onDisconnectDrive: () => {
+        signOut();
+        clearFolderCache();
+        this.settingsPanel.render();
+      },
       onSyncNow: () => this.syncNow(),
       isDriveConnected: () => hasToken(),
       getLastSyncTime: () => getLastSyncTime(),

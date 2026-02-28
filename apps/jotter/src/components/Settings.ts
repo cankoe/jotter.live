@@ -212,7 +212,7 @@ export class SettingsPanel {
     this.render();
   }
 
-  private render(): void {
+  render(): void {
     this.panelEl.innerHTML = "";
 
     // Header
