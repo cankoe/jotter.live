@@ -4,6 +4,11 @@ import path from "path";
 
 export default defineConfig({
   root: ".",
+  server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
+  },
   resolve: {
     alias: {
       "@capture/editor": path.resolve(__dirname, "../../packages/capture-editor/src"),
