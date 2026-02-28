@@ -66,6 +66,11 @@ export class NotesDB {
     return this.getDB().get("notes", id);
   }
 
+  /** Insert or update a full note object (used for workspace restore) */
+  async put(note: Note): Promise<void> {
+    await this.getDB().put("notes", note);
+  }
+
   async update(
     id: string,
     changes: Partial<Pick<Note, "content" | "deletedAt">>

@@ -382,15 +382,31 @@ export class App {
 
   private async importFullWorkspace(file: File): Promise<void> {
     const result = await importWorkspace(file);
+    let notesAdded = 0;
+
+    // Store files (additive — store handles dedup by content)
     for (const f of result.files) {
       await this.images.store(f.blob, f.filename);
     }
-    for (const note of result.notes) {
-      await this.db.create(note.content);
+
+    // Restore full notes with original IDs/timestamps (skip existing)
+    for (const note of result.fullNotes) {
+      const existing = await this.db.get(note.id);
+      if (!existing) {
+        await this.db.put(note);
+        notesAdded++;
+      }
     }
+
+    // Create simple notes (legacy format, no IDs)
+    for (const note of result.simpleNotes) {
+      await this.db.create(note.content);
+      notesAdded++;
+    }
+
     await this.refreshNoteList();
     if (this.attachmentsPane.isOpen()) this.attachmentsPane.refresh();
-    showToast({ message: `Imported ${result.notes.length} note(s), ${result.files.length} file(s)` });
+    showToast({ message: `Imported ${notesAdded} note(s), ${result.files.length} file(s)` });
   }
 
   private setupSidebarDragDrop(): void {

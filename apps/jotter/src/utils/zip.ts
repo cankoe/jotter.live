@@ -137,18 +137,11 @@ export async function exportWorkspace(
   };
   zip.file("metadata.json", JSON.stringify(metadata, null, 2));
 
-  // All notes as markdown
+  // All notes as markdown — use note ID as filename for reliable round-trip
   const notesFolder = zip.folder("notes")!;
   for (const note of [...notes, ...trashedNotes]) {
-    const safeName = sanitizeFilename(note.title || "Untitled");
-    let filename = `${safeName}.md`;
-    let counter = 1;
-    while (notesFolder.file(filename)) {
-      filename = `${safeName}-${counter++}.md`;
-    }
-    // Rewrite jotter-file:// to relative files/ paths for portability
     const exportContent = note.content.replace(JOTTER_FILE_RE, (_, fname) => `files/${fname}`);
-    notesFolder.file(filename, exportContent);
+    notesFolder.file(`${note.id}.md`, exportContent);
   }
 
   // All files from the store
@@ -165,32 +158,71 @@ export async function exportWorkspace(
   return new Blob([buf], { type: "application/zip" });
 }
 
-/**
- * Import a full workspace zip. Returns notes to create and files to store.
- * Supports both workspace format (notes/ + files/) and legacy format (.md at root + images/).
- */
-export async function importWorkspace(file: File): Promise<{
-  notes: { title: string; content: string }[];
+export interface WorkspaceImportResult {
+  /** Full note objects with original IDs/timestamps (from workspace format) */
+  fullNotes: Note[];
+  /** Simple notes without metadata (from legacy format) */
+  simpleNotes: { title: string; content: string }[];
   files: { filename: string; blob: Blob }[];
-}> {
+}
+
+/**
+ * Import a full workspace zip. Returns notes and files to restore.
+ * Supports both workspace format (notes/ + files/ + metadata.json) and legacy format.
+ * Workspace format preserves note IDs, timestamps, and deleted state.
+ */
+export async function importWorkspace(file: File): Promise<WorkspaceImportResult> {
   const buf = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(buf);
 
-  const notes: { title: string; content: string }[] = [];
+  const fullNotes: Note[] = [];
+  const simpleNotes: { title: string; content: string }[] = [];
   const files: { filename: string; blob: Blob }[] = [];
 
-  // Detect format: workspace (has notes/ folder) or legacy (has .md at root)
   const hasNotesFolder = Object.keys(zip.files).some((p) => p.startsWith("notes/"));
 
   if (hasNotesFolder) {
-    // Workspace format
+    // Parse metadata for note IDs and timestamps
+    const metadataMap = new Map<string, {
+      id: string; title: string; createdAt: number; updatedAt: number;
+      deleted: boolean; deletedAt: number | null;
+    }>();
+
+    const metaFile = zip.file("metadata.json");
+    if (metaFile) {
+      try {
+        const metaJson = JSON.parse(await metaFile.async("text"));
+        if (metaJson.notes) {
+          for (const n of metaJson.notes) {
+            metadataMap.set(n.id, n);
+          }
+        }
+      } catch { /* ignore bad metadata */ }
+    }
+
+    // Extract notes — match by ID in filename
     for (const [path, entry] of Object.entries(zip.files)) {
       if (path.startsWith("notes/") && path.endsWith(".md") && !entry.dir) {
         const text = await entry.async("text");
-        // Rewrite relative files/ paths back to jotter-file://
         const content = text.replace(/files\/([^\s)]+)/g, "jotter-file://$1");
-        notes.push({ title: deriveTitle(content), content });
+        const basename = path.replace("notes/", "").replace(".md", "");
+
+        const meta = metadataMap.get(basename);
+        if (meta) {
+          fullNotes.push({
+            id: meta.id,
+            content,
+            title: deriveTitle(content),
+            createdAt: meta.createdAt,
+            updatedAt: meta.updatedAt,
+            deleted: meta.deleted,
+            deletedAt: meta.deletedAt,
+          });
+        } else {
+          simpleNotes.push({ title: deriveTitle(content), content });
+        }
       }
+
       if (path.startsWith("files/") && !entry.dir) {
         const name = path.replace("files/", "");
         const arrayBuf = await entry.async("arraybuffer");
@@ -198,13 +230,13 @@ export async function importWorkspace(file: File): Promise<{
       }
     }
   } else {
-    // Legacy format (root .md + images/)
+    // Legacy format
     const parsed = await parseZipFile(file);
-    notes.push(...parsed.notes);
+    simpleNotes.push(...parsed.notes);
     files.push(...parsed.images.map((i) => ({ filename: i.filename, blob: i.blob })));
   }
 
-  return { notes, files };
+  return { fullNotes, simpleNotes, files };
 }
 
 function deriveTitle(content: string): string {
