@@ -82,6 +82,7 @@ export async function syncNotes(
   db: NotesDB,
   imageStore: ImageStore,
   direction: SyncDirection = "both",
+  onProgress?: (message: string) => void,
 ): Promise<SyncResult> {
   const result: SyncResult = {
     notesUploaded: 0,
@@ -91,9 +92,11 @@ export async function syncNotes(
     filesDownloaded: 0,
   };
 
+  onProgress?.("Connecting to Google Drive...");
   const { notesId, filesId, rootId } = await ensureJotterFolder();
 
   // --- Sync notes ---
+  onProgress?.("Comparing notes...");
   const localNotes = await db.getAll();
   const remoteNoteFiles = await listFiles(notesId);
   const remoteNoteMap = new Map<string, DriveFile>();
@@ -114,6 +117,7 @@ export async function syncNotes(
       if (!remote) {
         // Not in remote — upload
         if (!note.deleted) {
+          onProgress?.(`Uploading note: ${note.title || "Untitled"}`);
           await uploadFile(notesId, `${note.id}.md`, serializeNote(note), "text/markdown");
           result.notesUploaded++;
         }
@@ -122,10 +126,11 @@ export async function syncNotes(
         if (note.updatedAt > remoteModified) {
           // Local is newer — upload
           if (note.deleted && note.deletedAt && note.deletedAt > remoteModified) {
-            // Note was locally deleted after remote was last modified — delete remote
+            onProgress?.(`Deleting remote: ${note.title || "Untitled"}`);
             await deleteFile(remote.id);
             result.notesDeleted++;
           } else {
+            onProgress?.(`Updating note: ${note.title || "Untitled"}`);
             await uploadFile(notesId, `${note.id}.md`, serializeNote(note), "text/markdown", remote.id);
             result.notesUploaded++;
           }
@@ -142,6 +147,7 @@ export async function syncNotes(
 
       if (!local) {
         // Not in local — download
+        onProgress?.(`Downloading note: ${remote.name}`);
         const blob = await downloadFile(remote.id);
         const text = await blob.text();
         const parsed = parseNote(text);
@@ -151,6 +157,7 @@ export async function syncNotes(
         }
       } else if (direction === "both" && remoteModified > local.updatedAt) {
         // Remote is newer — download and update
+        onProgress?.(`Updating local: ${remote.name}`);
         const blob = await downloadFile(remote.id);
         const text = await blob.text();
         const parsed = parseNote(text);
@@ -170,10 +177,12 @@ export async function syncNotes(
     remoteFileMap.set(f.name, f);
   }
 
+  onProgress?.("Comparing files...");
+
   if (direction === "push" || direction === "both") {
-    // Upload local files not in remote
     for (const name of localFileNames) {
       if (!remoteFileMap.has(name)) {
+        onProgress?.(`Uploading file: ${name}`);
         const blob = await imageStore.retrieve(name);
         if (blob) {
           await uploadFile(filesId, name, blob, blob.type || "application/octet-stream");
@@ -188,6 +197,7 @@ export async function syncNotes(
     const localFileSet = new Set(localFileNames);
     for (const [name, remote] of remoteFileMap) {
       if (!localFileSet.has(name)) {
+        onProgress?.(`Downloading file: ${name}`);
         const blob = await downloadFile(remote.id);
         await imageStore.store(blob, name);
         result.filesDownloaded++;
@@ -196,6 +206,7 @@ export async function syncNotes(
   }
 
   // --- Upload settings ---
+  onProgress?.("Syncing settings...");
   if (direction === "push" || direction === "both") {
     const settings = loadSettings();
     const remoteRootFiles = await listFiles(rootId);

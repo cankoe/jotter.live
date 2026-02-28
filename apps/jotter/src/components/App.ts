@@ -504,7 +504,9 @@ export class App {
     if (this.isSyncing || !isSignedIn()) return;
     this.isSyncing = true;
     try {
-      const result = await syncNotes(this.db, this.images);
+      const result = await syncNotes(this.db, this.images, "both", (msg) => {
+        showToast({ message: msg, duration: 0 });
+      });
       const parts: string[] = [];
       if (result.notesUploaded) parts.push(`${result.notesUploaded} up`);
       if (result.notesDownloaded) parts.push(`${result.notesDownloaded} down`);
