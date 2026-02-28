@@ -1,6 +1,6 @@
 import { showToast } from "./Toast";
 
-const PRIVACY_POLICY = `# Privacy Policy
+export const PRIVACY_POLICY = `# Privacy Policy
 
 *Last updated: February 28, 2026*
 
@@ -44,7 +44,7 @@ Jotter is hosted on Cloudflare. See [Cloudflare's Privacy Policy](https://www.cl
 Questions? Email [dev@jotter.live](mailto:dev@jotter.live).
 `;
 
-const TERMS_OF_SERVICE = `# Terms of Service
+export const TERMS_OF_SERVICE = `# Terms of Service
 
 *Last updated: February 28, 2026*
 
@@ -305,8 +305,8 @@ export class SettingsPanel {
 
     // -- Legal --
     body.appendChild(this.sectionHeader("Legal"));
-    body.appendChild(this.noteLink("Privacy Policy", PRIVACY_POLICY));
-    body.appendChild(this.noteLink("Terms of Service", TERMS_OF_SERVICE));
+    body.appendChild(this.linkRow("Privacy Policy", "/privacy"));
+    body.appendChild(this.linkRow("Terms of Service", "/terms"));
 
     this.panelEl.append(header, body);
   }
@@ -321,6 +321,14 @@ export class SettingsPanel {
     if (href.startsWith("http") || href.startsWith("mailto:")) {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
+    } else if (href === "/privacy" || href === "/terms") {
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        const content = href === "/privacy" ? PRIVACY_POLICY : TERMS_OF_SERVICE;
+        this.options.onCreateNote(content);
+        history.pushState(null, "", href);
+        this.close();
+      });
     }
     row.appendChild(link);
     return row;
