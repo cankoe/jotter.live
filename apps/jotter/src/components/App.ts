@@ -9,7 +9,7 @@ import { showToast } from "./Toast";
 import { showContextMenu } from "./ContextMenu";
 import { exportNotesToZip, importFromZip, exportWorkspace, importWorkspace } from "../utils/zip";
 import { LandingOverlay } from "./LandingOverlay";
-import { SettingsPanel, loadSettings, applySettings } from "./Settings";
+import { SettingsPanel, loadSettings, saveSettings, applySettings } from "./Settings";
 import { createWelcomeNote } from "../welcome";
 
 export class App {
@@ -353,7 +353,7 @@ export class App {
   private async exportFullWorkspace(): Promise<void> {
     const notes = await this.db.listActive();
     const trashed = await this.db.listTrashed();
-    const blob = await exportWorkspace(notes, trashed, this.images);
+    const blob = await exportWorkspace(notes, trashed, this.images, loadSettings());
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -404,9 +404,17 @@ export class App {
       notesAdded++;
     }
 
+    // Restore settings if present
+    if (result.settings) {
+      saveSettings(result.settings);
+      applySettings(result.settings);
+    }
+
     await this.refreshNoteList();
     if (this.attachmentsPane.isOpen()) this.attachmentsPane.refresh();
-    showToast({ message: `Imported ${notesAdded} note(s), ${result.files.length} file(s)` });
+    const parts = [`${notesAdded} note(s)`, `${result.files.length} file(s)`];
+    if (result.settings) parts.push("settings");
+    showToast({ message: `Imported ${parts.join(", ")}` });
   }
 
   private setupSidebarDragDrop(): void {

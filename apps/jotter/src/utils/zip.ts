@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import type { Note } from "../storage/db";
 import type { ImageStore } from "../storage/images";
+import type { SettingsValues } from "../components/Settings";
 
 const JOTTER_FILE_RE = /jotter-file:\/\/([^\s)]+)/g;
 
@@ -118,14 +119,16 @@ async function parseZipFile(file: File): Promise<{
 export async function exportWorkspace(
   notes: Note[],
   trashedNotes: Note[],
-  fileStore: ImageStore
+  fileStore: ImageStore,
+  settings?: SettingsValues
 ): Promise<Blob> {
   const zip = new JSZip();
 
-  // Metadata: note IDs, timestamps, deleted state
-  const metadata = {
-    version: 1,
+  // Metadata: note IDs, timestamps, deleted state, settings
+  const metadata: Record<string, unknown> = {
+    version: 2,
     exportedAt: Date.now(),
+    settings: settings || null,
     notes: [...notes, ...trashedNotes].map((n) => ({
       id: n.id,
       title: n.title,
@@ -164,6 +167,8 @@ export interface WorkspaceImportResult {
   /** Simple notes without metadata (from legacy format) */
   simpleNotes: { title: string; content: string }[];
   files: { filename: string; blob: Blob }[];
+  /** Settings from the exported workspace (null if not present) */
+  settings: SettingsValues | null;
 }
 
 /**
@@ -178,6 +183,7 @@ export async function importWorkspace(file: File): Promise<WorkspaceImportResult
   const fullNotes: Note[] = [];
   const simpleNotes: { title: string; content: string }[] = [];
   const files: { filename: string; blob: Blob }[] = [];
+  let settings: SettingsValues | null = null;
 
   const hasNotesFolder = Object.keys(zip.files).some((p) => p.startsWith("notes/"));
 
@@ -196,6 +202,9 @@ export async function importWorkspace(file: File): Promise<WorkspaceImportResult
           for (const n of metaJson.notes) {
             metadataMap.set(n.id, n);
           }
+        }
+        if (metaJson.settings) {
+          settings = metaJson.settings as SettingsValues;
         }
       } catch { /* ignore bad metadata */ }
     }
@@ -236,7 +245,7 @@ export async function importWorkspace(file: File): Promise<WorkspaceImportResult
     files.push(...parsed.images.map((i) => ({ filename: i.filename, blob: i.blob })));
   }
 
-  return { fullNotes, simpleNotes, files };
+  return { fullNotes, simpleNotes, files, settings };
 }
 
 function deriveTitle(content: string): string {
