@@ -121,7 +121,7 @@ const DEFAULTS: SettingsValues = {
   editorMaxWidth: 720,
   trashRetentionDays: 30,
   showToolbar: true,
-  autoSync: false,
+  autoSync: true,
 };
 
 const STORAGE_KEY = "jotter-settings";
@@ -180,6 +180,7 @@ export interface SettingsPanelOptions {
   onSyncNow: () => void;
   isDriveConnected: () => boolean;
   getLastSyncTime: () => number | null;
+  getDriveFolderUrl: () => string | null;
 }
 
 export class SettingsPanel {
@@ -538,6 +539,12 @@ export class SettingsPanel {
 
       // Auto-sync toggle
       frag.appendChild(this.toggleRow("Auto-sync after saving", "autoSync"));
+
+      // Drive folder link
+      const folderUrl = this.options.getDriveFolderUrl();
+      if (folderUrl) {
+        frag.appendChild(this.linkRow("Open Jotter folder in Drive", folderUrl));
+      }
 
       // Disconnect
       frag.appendChild(this.actionRow(

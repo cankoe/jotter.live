@@ -94,6 +94,17 @@ export async function ensureJotterFolder(): Promise<{ rootId: string; notesId: s
 }
 
 /**
+ * Get the URL to the Jotter folder in Google Drive.
+ * Returns null if not yet synced.
+ */
+export function getJotterFolderUrl(): string | null {
+  if (cachedFolderId) {
+    return `https://drive.google.com/drive/folders/${cachedFolderId}`;
+  }
+  return null;
+}
+
+/**
  * List all files in a Drive folder.
  */
 export async function listFiles(folderId: string): Promise<DriveFile[]> {

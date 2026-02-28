@@ -12,7 +12,7 @@ import { LandingOverlay } from "./LandingOverlay";
 import { SettingsPanel, loadSettings, saveSettings, applySettings, PRIVACY_POLICY, TERMS_OF_SERVICE } from "./Settings";
 import { createWelcomeNote } from "../welcome";
 import { isSignedIn, hasToken, signIn, signOut } from "../sync/google-auth";
-import { clearFolderCache } from "../sync/google-drive";
+import { clearFolderCache, getJotterFolderUrl } from "../sync/google-drive";
 import { syncNotes, getLastSyncTime } from "../sync/sync-engine";
 
 export class App {
@@ -63,6 +63,7 @@ export class App {
       onSyncNow: () => this.syncNow(),
       isDriveConnected: () => hasToken(),
       getLastSyncTime: () => getLastSyncTime(),
+      getDriveFolderUrl: () => getJotterFolderUrl(),
     });
 
     this.topBar = new TopBar({
