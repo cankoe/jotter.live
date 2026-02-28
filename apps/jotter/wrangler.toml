@@ -1,5 +1,4 @@
 name = "jotter-live"
-main = "worker.ts"
 compatibility_date = "2025-04-01"
 
 [assets]
