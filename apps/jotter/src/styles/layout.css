@@ -53,6 +53,15 @@
   background: var(--bg-active);
 }
 
+.topbar-btn.active {
+  background: var(--bg-active);
+  color: var(--accent);
+}
+
+.topbar-title.active {
+  color: var(--accent);
+}
+
 .topbar-btn svg {
   display: block;
 }

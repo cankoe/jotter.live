@@ -51,7 +51,10 @@ export class App {
     this.topBar = new TopBar({
       onNewNote: () => this.createNewNote(),
       onToggleSidebar: () => this.toggleSidebar(),
-      onToggleAttachments: () => this.attachmentsPane.toggle(),
+      onToggleAttachments: () => {
+        this.attachmentsPane.toggle();
+        this.topBar.setAttachmentsActive(this.attachmentsPane.isOpen());
+      },
       onShowAbout: () => this.showLanding(),
       onShowSettings: () => this.settingsPanel.toggle(),
     });
@@ -173,6 +176,7 @@ export class App {
       await this.createNewNote();
     }
     this.attachmentsPane.initIfOpen();
+    this.topBar.setAttachmentsActive(this.attachmentsPane.isOpen());
 
     // Landing overlay: inline script in index.html already hides it for returning users.
     // We just wire up the dismiss callback and keyboard handlers.
@@ -489,11 +493,13 @@ export class App {
     this.sidebarOpen = !this.sidebarOpen;
     this.sidebar.setOpen(this.sidebarOpen);
     this.overlay.classList.toggle("open", this.sidebarOpen);
+    this.topBar.setSidebarActive(this.sidebarOpen);
   }
 
   private closeSidebar(): void {
     this.sidebarOpen = false;
     this.sidebar.setOpen(false);
     this.overlay.classList.toggle("open", false);
+    this.topBar.setSidebarActive(false);
   }
 }
