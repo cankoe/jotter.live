@@ -118,7 +118,7 @@ class FileChipWidget extends WidgetType {
     icon.style.fontSize = "0.85em";
 
     const text = document.createElement("span");
-    text.textContent = this.linkText || this.filename;
+    text.textContent = this.filename;
 
     chip.append(icon, text);
 
