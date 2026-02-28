@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Jotter</title>
+  <meta name="description" content="Jotter's privacy policy. We do not collect, store, or transmit any of your data. Everything stays in your browser.">
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+  <link rel="canonical" href="https://jotter.live/privacy">
+  <style>
+    :root{--bg:#fff;--text:#1a1a1a;--muted:#666;--accent:#2563eb}
+    @media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--text:#e5e5e5;--muted:#a3a3a3;--accent:#3b82f6}}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+    main{max-width:640px;margin:0 auto;padding:48px 24px}
+    h1{font-size:28px;margin-bottom:8px}
+    .sub{color:var(--muted);font-size:14px;margin-bottom:32px}
+    h2{font-size:18px;margin:28px 0 12px}
+    p,li{margin-bottom:12px;font-size:15px}
+    ul{padding-left:20px}
+    a{color:var(--accent)}
+    .back{display:inline-block;margin-bottom:24px;color:var(--muted);text-decoration:none;font-size:14px}
+    .back:hover{color:var(--accent)}
+  </style>
+</head>
+<body>
+<main>
+  <a href="/" class="back">&larr; Back to Jotter</a>
+  <h1>Privacy Policy</h1>
+  <p class="sub">Last updated: February 28, 2026</p>
+
+  <h2>The short version</h2>
+  <p>Jotter does not collect, store, or transmit any of your data. Everything stays in your browser. When you use Google Drive sync, your data goes directly from your browser to your Google Drive — we never see, proxy, or store it.</p>
+
+  <h2>Data storage</h2>
+  <p>All your notes, files, and settings are stored locally in your browser using IndexedDB and the Origin Private File System (OPFS). No data is sent to any Jotter server.</p>
+
+  <h2>Google Drive sync</h2>
+  <p>Jotter offers optional sync to Google Drive. When enabled:</p>
+  <ul>
+    <li>Your notes, files, and settings are synced directly between your browser and your personal Google Drive account</li>
+    <li>The sync connection is a direct OAuth token between your browser and Google — Jotter's servers are never involved</li>
+    <li>We cannot see, access, or read any of your synced data</li>
+    <li>Data is stored in a "Jotter" folder in your Drive that only you and the Jotter app can access (using the <code>drive.file</code> scope)</li>
+    <li>You can disconnect at any time in Settings &gt; Sync, which revokes the connection but keeps your local data</li>
+    <li>Deleting the Jotter folder from your Drive removes all synced data from Google</li>
+  </ul>
+
+  <h2>No accounts</h2>
+  <p>Jotter does not have its own user accounts. Google Drive sync uses your existing Google account via OAuth — we never receive or store your Google password.</p>
+
+  <h2>No analytics or tracking</h2>
+  <p>Jotter does not use cookies, analytics, tracking pixels, or any third-party scripts that monitor your behavior.</p>
+
+  <h2>No server communication</h2>
+  <p>After the initial page load, Jotter works entirely offline. The only external requests are:</p>
+  <ul>
+    <li>Google Fonts (Instrument Serif) loaded on the landing page</li>
+    <li>Google Identity Services library (for Google Drive OAuth, loaded from accounts.google.com)</li>
+    <li>Google Drive API (only when sync is enabled, goes directly to googleapis.com)</li>
+  </ul>
+
+  <h2>Data export</h2>
+  <p>You can export all your data at any time using Settings &gt; Data &gt; Export. This creates a ZIP file containing all your notes, files, and settings.</p>
+
+  <h2>Data deletion</h2>
+  <p>You can delete all your data at any time using Settings &gt; Data &gt; Clear. You can also clear your browser's site data for jotter.live.</p>
+
+  <h2>Third-party services</h2>
+  <ul>
+    <li><strong>Cloudflare</strong> — hosts the static app files. See <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare's Privacy Policy</a>.</li>
+    <li><strong>Google Drive</strong> — optional sync only. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p>Questions? Email <a href="mailto:dev@jotter.live">dev@jotter.live</a>.</p>
+</main>
+</body>
+</html>
