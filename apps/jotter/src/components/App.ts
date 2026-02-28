@@ -152,7 +152,45 @@ export class App {
     this.root.appendChild(appEl);
   }
 
+  private async checkPrivateMode(): Promise<void> {
+    let isPrivate = false;
+
+    // Method 1: storage quota check (incognito typically has tiny quota)
+    if (navigator.storage?.estimate) {
+      try {
+        const { quota } = await navigator.storage.estimate();
+        // Incognito Chrome ~120MB, normal Chrome ~50GB+
+        if (quota && quota < 500 * 1024 * 1024) isPrivate = true;
+      } catch { /* ignore */ }
+    }
+
+    // Method 2: try to detect via IndexedDB persistence
+    if (!isPrivate) {
+      try {
+        const persisted = await navigator.storage?.persisted?.();
+        // In incognito, persisted() may return false or throw
+        // This alone isn't conclusive, so only use as supplementary signal
+      } catch {
+        isPrivate = true;
+      }
+    }
+
+    if (isPrivate) {
+      const banner = document.createElement("div");
+      banner.className = "incognito-banner";
+      banner.innerHTML = `
+        <span>You're in private/incognito mode — your notes and files will be lost when this window closes.</span>
+        <button class="incognito-dismiss" title="Dismiss">&times;</button>
+      `;
+      banner.querySelector(".incognito-dismiss")!.addEventListener("click", () => banner.remove());
+      this.root.querySelector(".app")?.prepend(banner);
+    }
+  }
+
   async init(): Promise<void> {
+    // Check for incognito/private mode
+    this.checkPrivateMode();
+
     // Apply saved settings
     applySettings(loadSettings());
 

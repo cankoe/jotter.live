@@ -6,6 +6,35 @@
   height: 100%;
 }
 
+.incognito-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 6px 16px;
+  background: #f59e0b;
+  color: #000;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.incognito-dismiss {
+  background: none;
+  border: none;
+  color: #000;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.incognito-dismiss:hover {
+  opacity: 1;
+}
+
 /* ── Top Bar ──────────────────────────────────── */
 
 .topbar {
