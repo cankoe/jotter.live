@@ -138,26 +138,27 @@
 .settings-coffee {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
+  gap: 5px;
+  padding: 4px 12px;
   background: #ffdd00;
   color: #000000;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   font-family: var(--font-sans);
-  border-radius: 8px;
+  border-radius: 6px;
   text-decoration: none;
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .settings-coffee:hover {
   transform: translateY(-1px);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   color: #000000;
 }
 
-.settings-coffee-icon {
-  font-size: 16px;
+.settings-coffee svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* Select */
