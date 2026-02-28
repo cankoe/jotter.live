@@ -57,20 +57,26 @@ export class JotterEditor {
       dom.classList.remove("drag-over");
     });
 
+    // Use capture phase to intercept before CodeMirror's own drop handling
     dom.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      dom.classList.remove("drag-over");
-      if (!this.options.onImagePaste) return;
       const files = e.dataTransfer?.files;
-      if (!files) return;
+      if (!files || files.length === 0 || !this.options.onImagePaste) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      dom.classList.remove("drag-over");
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const ref = await this.options.onImagePaste(file);
         if (file.type.startsWith("image/")) {
-          const ref = await this.options.onImagePaste(file);
-          this.insertAtCursor(`![image](jotter-file://${ref})`);
+          this.insertAtCursor(`![image](jotter-file://${ref})\n`);
+        } else {
+          const ext = file.name.split(".").pop() || "file";
+          this.insertAtCursor(`[${ext} file](jotter-file://${ref})\n`);
         }
       }
-    });
+    }, { capture: true });
   }
 
   private insertAtCursor(text: string): void {
