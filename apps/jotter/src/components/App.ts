@@ -44,6 +44,7 @@ export class App {
       onImportWorkspace: (file) => this.importFullWorkspace(file),
       onClearAllData: () => this.clearAllData(),
       onShowWelcome: () => this.showLanding(),
+      onCreateNote: (content) => this.createNoteWithContent(content),
       onSettingsChange: () => {},
     });
 
@@ -215,6 +216,14 @@ export class App {
     this.isDraft = true;
     this.editorPane.loadNote("");
     this.sidebar.update(this.notes, this.trashedNotes, null, true);
+  }
+
+  private async createNoteWithContent(content: string): Promise<void> {
+    const note = await this.db.create(content);
+    this.activeNoteId = note.id;
+    this.isDraft = false;
+    this.editorPane.loadNote(content);
+    await this.refreshNoteList();
   }
 
   private async selectNote(id: string): Promise<void> {
