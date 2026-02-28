@@ -30,9 +30,23 @@ class FileResolver {
     return promise;
   }
 
-  revokeAll(): void {
+  /** Force re-resolve a filename (used when blob URL becomes stale) */
+  async refresh(filename: string): Promise<string | undefined> {
+    const old = this.cache.get(filename);
+    if (old) URL.revokeObjectURL(old);
+    this.cache.delete(filename);
+    this.pending.delete(filename);
+    return this.resolve(filename);
+  }
+
+  invalidateAll(): void {
     for (const url of this.cache.values()) URL.revokeObjectURL(url);
     this.cache.clear();
+    this.pending.clear();
+  }
+
+  revokeAll(): void {
+    this.invalidateAll();
   }
 }
 
@@ -51,6 +65,17 @@ class InlineImageWidget extends WidgetType {
     img.style.display = "block";
     img.style.cursor = "pointer";
     img.title = `${this.filename} — click to open`;
+    let retried = false;
+    img.addEventListener("error", () => {
+      // Blob URL went stale — refresh from OPFS
+      if (!retried) {
+        retried = true;
+        this.resolver.refresh(this.filename).then((freshUrl) => {
+          if (freshUrl) img.src = freshUrl;
+        });
+      }
+    });
+
     this.resolver.resolve(this.filename).then((url) => {
       if (url) {
         img.src = url;
@@ -173,6 +198,10 @@ export function createImageRenderExtension(store: ImageStore) {
     }
 
     update(update: ViewUpdate) {
+      if (update.docChanged) {
+        // Doc changed (likely note switch) — invalidate stale blob URLs
+        resolver.invalidateAll();
+      }
       if (update.docChanged || update.selectionSet || update.viewportChanged) {
         this.decorations = buildFileDecorations(update.view, resolver);
       }
