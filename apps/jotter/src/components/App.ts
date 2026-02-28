@@ -11,7 +11,7 @@ import { exportNotesToZip, importFromZip, exportWorkspace, importWorkspace } fro
 import { LandingOverlay } from "./LandingOverlay";
 import { SettingsPanel, loadSettings, saveSettings, applySettings, PRIVACY_POLICY, TERMS_OF_SERVICE } from "./Settings";
 import { createWelcomeNote } from "../welcome";
-import { isSignedIn, signIn, signOut } from "../sync/google-auth";
+import { isSignedIn, hasToken, signIn, signOut } from "../sync/google-auth";
 import { clearFolderCache } from "../sync/google-drive";
 import { syncNotes, getLastSyncTime } from "../sync/sync-engine";
 
@@ -51,10 +51,17 @@ export class App {
       onShowWelcome: () => this.showLanding(),
       onCreateNote: (content) => this.createNoteWithContent(content),
       onSettingsChange: () => {},
-      onConnectDrive: () => signIn(),
+      onConnectDrive: () => {
+        signIn().then(() => {
+          showToast({ message: "Google Drive connected" });
+        }).catch((err) => {
+          console.error("Drive sign-in failed:", err);
+          showToast({ message: "Failed to connect Google Drive" });
+        });
+      },
       onDisconnectDrive: () => { signOut(); clearFolderCache(); },
       onSyncNow: () => this.syncNow(),
-      isDriveConnected: () => isSignedIn(),
+      isDriveConnected: () => hasToken(),
       getLastSyncTime: () => getLastSyncTime(),
     });
 

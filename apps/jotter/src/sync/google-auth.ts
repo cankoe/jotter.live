@@ -1,44 +1,18 @@
+/**
+ * Google Identity Services (GIS) based OAuth for Google Drive.
+ *
+ * Uses a popup flow — no redirects, no client secret, no PKCE.
+ * Access tokens are short-lived (1 hour). When expired, the user
+ * clicks Sync again and GIS silently refreshes or re-prompts.
+ */
+
 const CLIENT_ID = "669755857434-qvta604cln191dmgqh4pnvb9snd6dvq9.apps.googleusercontent.com";
-const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
 const TOKEN_KEY = "jotter-gdrive-token";
-const VERIFIER_KEY = "jotter-pkce-verifier";
-
-function getRedirectUri(): string {
-  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-    return `${location.protocol}//${location.host}`;
-  }
-  return "https://jotter.live";
-}
 
 interface StoredToken {
   access_token: string;
-  refresh_token: string;
   expires_at: number;
-}
-
-// --- PKCE helpers ---
-
-function generateCodeVerifier(): string {
-  const array = new Uint8Array(64);
-  crypto.getRandomValues(array);
-  return base64UrlEncode(array);
-}
-
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return base64UrlEncode(new Uint8Array(digest));
-}
-
-function base64UrlEncode(buffer: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < buffer.length; i++) {
-    binary += String.fromCharCode(buffer[i]);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 // --- Token storage ---
@@ -51,7 +25,11 @@ function getStoredToken(): StoredToken | null {
   return null;
 }
 
-function storeToken(token: StoredToken): void {
+function storeToken(accessToken: string, expiresIn: number): void {
+  const token: StoredToken = {
+    access_token: accessToken,
+    expires_at: Date.now() + expiresIn * 1000,
+  };
   localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
 }
 
@@ -59,127 +37,90 @@ function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// --- GIS token client ---
+
+let tokenClient: google.accounts.oauth2.TokenClient | null = null;
+let resolveAuth: ((token: string) => void) | null = null;
+let rejectAuth: ((err: Error) => void) | null = null;
+
+function getTokenClient(): google.accounts.oauth2.TokenClient {
+  if (tokenClient) return tokenClient;
+
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPE,
+    callback: (response) => {
+      if (response.error) {
+        rejectAuth?.(new Error(response.error_description || response.error));
+        rejectAuth = null;
+        resolveAuth = null;
+        return;
+      }
+      const expiresIn = parseInt(response.expires_in, 10) || 3600;
+      storeToken(response.access_token, expiresIn);
+      resolveAuth?.(response.access_token);
+      resolveAuth = null;
+      rejectAuth = null;
+    },
+    error_callback: (err) => {
+      rejectAuth?.(new Error(err.message || "OAuth popup error"));
+      rejectAuth = null;
+      resolveAuth = null;
+    },
+  });
+
+  return tokenClient;
+}
+
 // --- Public API ---
 
 export function isSignedIn(): boolean {
+  const token = getStoredToken();
+  return token !== null && Date.now() < token.expires_at;
+}
+
+export function hasToken(): boolean {
   return getStoredToken() !== null;
 }
 
-export async function signIn(): Promise<void> {
-  const verifier = generateCodeVerifier();
-  const challenge = await generateCodeChallenge(verifier);
-
-  sessionStorage.setItem(VERIFIER_KEY, verifier);
-
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: getRedirectUri(),
-    response_type: "code",
-    scope: SCOPE,
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-    access_type: "offline",
-    prompt: "consent",
+/**
+ * Request an access token via GIS popup.
+ * If user has an active Google session, this may resolve silently.
+ * Otherwise, a consent popup opens.
+ */
+export function signIn(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    resolveAuth = resolve;
+    rejectAuth = reject;
+    const client = getTokenClient();
+    if (hasToken()) {
+      // Try silent refresh first
+      client.requestAccessToken({ prompt: "" });
+    } else {
+      client.requestAccessToken({ prompt: "consent" });
+    }
   });
-
-  window.location.href = `${AUTH_URL}?${params.toString()}`;
 }
 
 export function signOut(): void {
-  clearToken();
-}
-
-export async function getAccessToken(): Promise<string> {
   const token = getStoredToken();
-  if (!token) throw new Error("Not signed in to Google Drive");
-
-  // If token expires within 5 minutes, refresh it
-  if (Date.now() > token.expires_at - 5 * 60 * 1000) {
-    return refreshAccessToken(token.refresh_token);
+  if (token) {
+    // Revoke the token at Google
+    google.accounts.oauth2.revoke(token.access_token, () => {});
   }
-
-  return token.access_token;
-}
-
-async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const resp = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!resp.ok) {
-    // If refresh fails, clear tokens — user needs to re-auth
-    clearToken();
-    throw new Error("Failed to refresh Google Drive token. Please sign in again.");
-  }
-
-  const data = await resp.json();
-  const token: StoredToken = {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token || refreshToken,
-    expires_at: Date.now() + (data.expires_in as number) * 1000,
-  };
-  storeToken(token);
-  return token.access_token;
+  clearToken();
+  tokenClient = null;
 }
 
 /**
- * Call this on page load, before app init.
- * If the URL has a ?code= parameter from Google OAuth redirect,
- * exchanges it for tokens, stores them, and cleans the URL.
+ * Get a valid access token. If expired, triggers a refresh via GIS.
+ * May open a popup if the Google session has expired.
  */
-export async function handleOAuthRedirect(): Promise<void> {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get("code");
-  if (!code) return;
-
-  const verifier = sessionStorage.getItem(VERIFIER_KEY);
-  if (!verifier) {
-    console.warn("OAuth code found but no PKCE verifier in sessionStorage");
-    cleanUrl();
-    return;
+export async function getAccessToken(): Promise<string> {
+  const token = getStoredToken();
+  if (token && Date.now() < token.expires_at - 60 * 1000) {
+    return token.access_token;
   }
-
-  try {
-    const resp = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: CLIENT_ID,
-        code,
-        code_verifier: verifier,
-        grant_type: "authorization_code",
-        redirect_uri: getRedirectUri(),
-      }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Token exchange failed: ${err}`);
-    }
-
-    const data = await resp.json();
-    const token: StoredToken = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: Date.now() + (data.expires_in as number) * 1000,
-    };
-    storeToken(token);
-  } catch (err) {
-    console.error("OAuth token exchange failed:", err);
-  } finally {
-    sessionStorage.removeItem(VERIFIER_KEY);
-    cleanUrl();
-  }
-}
-
-function cleanUrl(): void {
-  const url = new URL(window.location.href);
-  url.search = "";
-  window.history.replaceState({}, "", url.toString());
+  // Token expired or missing — request a new one
+  return signIn();
 }
