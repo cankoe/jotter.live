@@ -284,9 +284,9 @@ export class SettingsPanel {
       "Permanently delete all notes and files",
       "Clear",
       () => {
-        if (confirm("This will permanently delete ALL notes and files. This cannot be undone. Continue?")) {
-          this.options.onClearAllData();
+        if (confirm("This will permanently delete ALL notes, files, settings, and Drive connection. This cannot be undone. Continue?")) {
           this.close();
+          this.options.onClearAllData();
         }
       },
       true

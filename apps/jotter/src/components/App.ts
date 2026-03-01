@@ -112,7 +112,7 @@ export class App {
     this.attachmentsPane = new AttachmentsPane({
       fileStore: this.images,
       onInsertFile: (md) => this.editorPane.insertAtCursor(md),
-      onFilesDeleted: () => this.scheduleDebouncedSync(),
+      onFilesDeleted: () => this.syncNow(),
     });
 
     this.overlay = document.createElement("div");
@@ -642,7 +642,7 @@ export class App {
     }
     await this.refreshNoteList();
     showToast({ message: `${ids.length} note(s) moved to trash` });
-    this.scheduleDebouncedSync();
+    this.syncNow();
   }
 
   private async bulkExportNotes(ids: string[]): Promise<void> {
