@@ -76,6 +76,24 @@ function parseNote(text: string): Note | null {
   };
 }
 
+// --- Parallel execution helper ---
+
+async function runParallel<T>(
+  items: T[],
+  fn: (item: T) => Promise<void>,
+  concurrency = 5,
+): Promise<void> {
+  let i = 0;
+  async function next(): Promise<void> {
+    while (i < items.length) {
+      const idx = i++;
+      await fn(items[idx]);
+    }
+  }
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => next());
+  await Promise.all(workers);
+}
+
 // --- Sync engine ---
 
 export async function syncNotes(
@@ -129,53 +147,47 @@ export async function syncNotes(
   // Count total work items for progress calculation
   totalWork = localNotes.length + remoteNoteMap.size + localFileNames.length + remoteFileMap.size + 1; // +1 for settings
 
+  // --- Push notes (parallel) ---
   if (direction === "push" || direction === "both") {
-    // Upload local notes that are new or newer than remote
-    for (const note of localNotes) {
+    await runParallel(localNotes, async (note) => {
       const remote = remoteNoteMap.get(note.id);
       if (!remote) {
-        // Not in remote — upload
         if (!note.deleted) {
-          report(`Uploading note: ${note.title || "Untitled"}`);
+          report(`Uploading: ${note.title || "Untitled"}`);
           await uploadFile(notesId, `${note.id}.md`, serializeNote(note), "text/markdown");
           result.notesUploaded++;
         } else {
-          report(`Skipping deleted note: ${note.title || "Untitled"}`);
+          report(`Skipping deleted`);
         }
       } else {
         const remoteModified = new Date(remote.modifiedTime).getTime();
         if (note.updatedAt > remoteModified) {
-          // Local is newer — upload
           if (note.deleted && note.deletedAt && note.deletedAt > remoteModified) {
             report(`Deleting remote: ${note.title || "Untitled"}`);
             await deleteFile(remote.id);
             result.notesDeleted++;
           } else {
-            report(`Updating note: ${note.title || "Untitled"}`);
+            report(`Updating: ${note.title || "Untitled"}`);
             await uploadFile(notesId, `${note.id}.md`, serializeNote(note), "text/markdown", remote.id);
             result.notesUploaded++;
           }
         } else {
-          report(`Note up to date: ${note.title || "Untitled"}`);
+          report(`Up to date`);
         }
       }
-    }
+    });
   } else {
-    // Not pushing notes — mark them done for progress
-    for (const _note of localNotes) {
-      report("Skipping local note (pull-only)");
-    }
+    completed += localNotes.length;
   }
 
+  // --- Pull notes (parallel) ---
   if (direction === "pull" || direction === "both") {
-    // Download remote notes that are new or newer than local
-    for (const [noteId, remote] of remoteNoteMap) {
+    const remoteEntries = Array.from(remoteNoteMap.entries());
+    await runParallel(remoteEntries, async ([noteId, remote]) => {
       const local = localNoteMap.get(noteId);
       const remoteModified = new Date(remote.modifiedTime).getTime();
-
       if (!local) {
-        // Not in local — download
-        report(`Downloading note: ${remote.name}`);
+        report(`Downloading: ${remote.name}`);
         const blob = await downloadFile(remote.id);
         const text = await blob.text();
         const parsed = parseNote(text);
@@ -184,7 +196,6 @@ export async function syncNotes(
           result.notesDownloaded++;
         }
       } else if (direction === "both" && remoteModified > local.updatedAt) {
-        // Remote is newer — download and update
         report(`Updating local: ${remote.name}`);
         const blob = await downloadFile(remote.id);
         const text = await blob.text();
@@ -194,53 +205,43 @@ export async function syncNotes(
           result.notesDownloaded++;
         }
       } else {
-        report(`Remote note up to date: ${remote.name}`);
+        report(`Up to date`);
       }
-    }
+    });
   } else {
-    for (const [_noteId, _remote] of remoteNoteMap) {
-      report("Skipping remote note (push-only)");
-    }
+    completed += remoteNoteMap.size;
   }
 
-  // --- Sync files ---
+  // --- Push files (parallel) ---
+  onProgress?.("Syncing files...", (completed / totalWork) * 100);
 
   if (direction === "push" || direction === "both") {
-    for (const name of localFileNames) {
-      if (!remoteFileMap.has(name)) {
-        report(`Uploading file: ${name}`);
-        const blob = await imageStore.retrieve(name);
-        if (blob) {
-          await uploadFile(filesId, name, blob, blob.type || "application/octet-stream");
-          result.filesUploaded++;
-        }
-      } else {
-        report(`File up to date: ${name}`);
+    const filesToUpload = localFileNames.filter((n) => !remoteFileMap.has(n));
+    completed += localFileNames.length - filesToUpload.length; // skip already-synced
+    await runParallel(filesToUpload, async (name) => {
+      report(`Uploading: ${name}`);
+      const blob = await imageStore.retrieve(name);
+      if (blob) {
+        await uploadFile(filesId, name, blob, blob.type || "application/octet-stream");
+        result.filesUploaded++;
       }
-    }
+    });
   } else {
-    for (const _name of localFileNames) {
-      report("Skipping local file (pull-only)");
-    }
+    completed += localFileNames.length;
   }
 
   if (direction === "pull" || direction === "both") {
-    // Download remote files not in local
     const localFileSet = new Set(localFileNames);
-    for (const [name, remote] of remoteFileMap) {
-      if (!localFileSet.has(name)) {
-        report(`Downloading file: ${name}`);
-        const blob = await downloadFile(remote.id);
-        await imageStore.store(blob, name);
-        result.filesDownloaded++;
-      } else {
-        report(`Remote file up to date: ${name}`);
-      }
-    }
+    const filesToDownload = Array.from(remoteFileMap.entries()).filter(([n]) => !localFileSet.has(n));
+    completed += remoteFileMap.size - filesToDownload.length; // skip already-synced
+    await runParallel(filesToDownload, async ([name, remote]) => {
+      report(`Downloading: ${name}`);
+      const blob = await downloadFile(remote.id);
+      await imageStore.store(blob, name);
+      result.filesDownloaded++;
+    });
   } else {
-    for (const [_name, _remote] of remoteFileMap) {
-      report("Skipping remote file (push-only)");
-    }
+    completed += remoteFileMap.size;
   }
 
   // --- Upload settings ---
