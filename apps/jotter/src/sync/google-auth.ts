@@ -118,9 +118,16 @@ export function signOut(): void {
  */
 export async function getAccessToken(): Promise<string> {
   const token = getStoredToken();
-  if (token && Date.now() < token.expires_at - 60 * 1000) {
+  if (token && Date.now() < token.expires_at - 5 * 60 * 1000) {
+    // Token still valid (with 5 min buffer)
     return token.access_token;
   }
-  // Token expired or missing — request a new one
+  // Token expired, near expiry, or missing — get a fresh one via GIS
+  // GIS will silently refresh if Google session is active, or prompt if not
   return signIn();
+}
+
+/** Force clear the cached token (called on 401 errors) */
+export function invalidateToken(): void {
+  clearToken();
 }

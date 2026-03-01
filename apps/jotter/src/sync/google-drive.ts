@@ -22,7 +22,7 @@ async function authHeaders(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token}` };
 }
 
-async function driveRequest(url: string, options: RequestInit = {}): Promise<Response> {
+async function driveRequest(url: string, options: RequestInit = {}, retried = false): Promise<Response> {
   const headers = await authHeaders();
   const resp = await fetch(url, {
     ...options,
@@ -31,6 +31,13 @@ async function driveRequest(url: string, options: RequestInit = {}): Promise<Res
       ...options.headers,
     },
   });
+  if (resp.status === 401 && !retried) {
+    // Token rejected — invalidate cached token, get fresh one, retry
+    const { invalidateToken, signIn } = await import("./google-auth");
+    invalidateToken();
+    await signIn();
+    return driveRequest(url, options, true);
+  }
   if (!resp.ok) {
     const body = await resp.text();
     throw new Error(`Drive API error ${resp.status}: ${body}`);
