@@ -13,7 +13,7 @@ import { LandingOverlay } from "./LandingOverlay";
 import { SettingsPanel, loadSettings, saveSettings, applySettings, PRIVACY_POLICY, TERMS_OF_SERVICE } from "./Settings";
 import { createWelcomeNote } from "../welcome";
 import { isSignedIn, hasToken, signIn, signOut } from "../sync/google-auth";
-import { clearFolderCache, getJotterFolderUrl } from "../sync/google-drive";
+import { clearFolderCache, getJotterFolderUrl, ensureJotterFolder, listFiles, deleteFile } from "../sync/google-drive";
 import { syncNotes, getLastSyncTime } from "../sync/sync-engine";
 
 export class App {
@@ -112,7 +112,8 @@ export class App {
     this.attachmentsPane = new AttachmentsPane({
       fileStore: this.images,
       onInsertFile: (md) => this.editorPane.insertAtCursor(md),
-      onFilesDeleted: () => this.syncNow(),
+      onDeleteFile: (filename) => this.deleteFileFromDrive(filename),
+      onFilesDeleted: () => {},
     });
 
     this.overlay = document.createElement("div");
@@ -368,6 +369,8 @@ export class App {
 
   private async trashNote(id: string): Promise<void> {
     await this.db.softDelete(id);
+    // Delete from Drive immediately
+    this.deleteNoteFromDrive(id);
     if (this.activeNoteId === id) {
       this.activeNoteId = null;
       await this.createNewNote();
@@ -377,7 +380,12 @@ export class App {
       message: "Note moved to trash",
       action: {
         label: "Undo",
-        onClick: async () => { await this.db.restore(id); await this.refreshNoteList(); },
+        onClick: async () => {
+          await this.db.restore(id);
+          await this.refreshNoteList();
+          // Re-sync to re-upload the restored note
+          this.scheduleDebouncedSync();
+        },
       },
     });
   }
@@ -390,6 +398,7 @@ export class App {
 
   private async permanentlyDeleteNote(id: string): Promise<void> {
     await this.db.hardDelete(id);
+    this.deleteNoteFromDrive(id);
     await this.refreshNoteList();
     showToast({ message: "Note permanently deleted" });
   }
@@ -456,6 +465,34 @@ export class App {
     a.click();
     URL.revokeObjectURL(url);
     showToast({ message: "Workspace exported" });
+  }
+
+  private async deleteFileFromDrive(filename: string): Promise<void> {
+    if (!hasToken()) return;
+    try {
+      const { filesId } = await ensureJotterFolder();
+      const remoteFiles = await listFiles(filesId);
+      const remote = remoteFiles.find((f) => f.name === filename);
+      if (remote) {
+        await deleteFile(remote.id);
+      }
+    } catch (err) {
+      console.error(`Failed to delete ${filename} from Drive:`, err);
+    }
+  }
+
+  private async deleteNoteFromDrive(noteId: string): Promise<void> {
+    if (!hasToken()) return;
+    try {
+      const { notesId } = await ensureJotterFolder();
+      const remoteFiles = await listFiles(notesId);
+      const remote = remoteFiles.find((f) => f.name === `${noteId}.md`);
+      if (remote) {
+        await deleteFile(remote.id);
+      }
+    } catch (err) {
+      console.error(`Failed to delete note ${noteId} from Drive:`, err);
+    }
   }
 
   private async clearAllData(): Promise<void> {
@@ -632,6 +669,7 @@ export class App {
   private async bulkTrashNotes(ids: string[]): Promise<void> {
     for (const id of ids) {
       await this.db.softDelete(id);
+      this.deleteNoteFromDrive(id);
       if (this.activeNoteId === id) {
         this.activeNoteId = null;
         this.isDraft = false;
