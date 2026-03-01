@@ -1,35 +1,30 @@
 export class SyncBar {
   readonly el: HTMLElement;
   private textEl: HTMLElement;
-  private barEl: HTMLElement;
   private fillEl: HTMLElement;
 
   constructor() {
     this.el = document.createElement("div");
-    this.el.className = "sync-bar hidden";
+    this.el.className = "sync-toast hidden";
 
-    this.textEl = document.createElement("span");
-    this.textEl.className = "sync-bar-text";
+    this.textEl = document.createElement("div");
+    this.textEl.className = "sync-toast-text";
 
-    this.barEl = document.createElement("div");
-    this.barEl.className = "sync-bar-track";
+    const track = document.createElement("div");
+    track.className = "sync-toast-track";
     this.fillEl = document.createElement("div");
-    this.fillEl.className = "sync-bar-fill";
-    this.barEl.appendChild(this.fillEl);
+    this.fillEl.className = "sync-toast-fill";
+    track.appendChild(this.fillEl);
 
-    this.el.append(this.textEl, this.barEl);
+    this.el.append(this.textEl, track);
+    document.body.appendChild(this.el);
   }
 
-  show(text: string, progress?: number): void {
+  show(text: string): void {
     this.el.classList.remove("hidden");
     this.textEl.textContent = text;
-    if (progress !== undefined) {
-      this.fillEl.style.width = `${Math.min(100, Math.max(0, progress))}%`;
-    } else {
-      // Indeterminate — animate
-      this.fillEl.style.width = "";
-      this.fillEl.classList.add("indeterminate");
-    }
+    this.fillEl.style.width = "0%";
+    this.fillEl.classList.add("indeterminate");
   }
 
   update(text: string, progress: number): void {

@@ -37,48 +37,53 @@
 
 /* ── Sync Bar ────────────────────────────────── */
 
-.sync-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 16px;
+/* ── Sync Toast (floating bottom-right) ──────── */
+
+.sync-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 260px;
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text-secondary);
-  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+  z-index: 1001;
+  animation: toast-slide-in 0.25s ease-out;
 }
 
-.sync-bar.hidden { display: none; }
+.sync-toast.hidden { display: none; }
 
-.sync-bar-text {
+.sync-toast-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
 }
 
-.sync-bar-track {
-  flex: 1;
+.sync-toast-track {
   height: 3px;
   background: var(--border);
   border-radius: 2px;
   overflow: hidden;
 }
 
-.sync-bar-fill {
+.sync-toast-fill {
   height: 100%;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.2s ease;
+  transition: width 0.3s ease;
 }
 
-.sync-bar-fill.indeterminate {
+.sync-toast-fill.indeterminate {
   width: 30% !important;
-  animation: sync-bar-slide 1.2s ease-in-out infinite;
+  animation: sync-slide 1s ease-in-out infinite;
 }
 
-@keyframes sync-bar-slide {
+@keyframes sync-slide {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }

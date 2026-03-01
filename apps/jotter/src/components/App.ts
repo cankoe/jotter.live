@@ -178,7 +178,7 @@ export class App {
       attachmentsResizeHandle.el,
       this.attachmentsPane.el,
     );
-    appEl.append(this.topBar.el, this.syncBar.el, mainEl, this.overlay);
+    appEl.append(this.topBar.el, mainEl, this.overlay);
     this.root.innerHTML = "";
     this.root.appendChild(appEl);
   }
