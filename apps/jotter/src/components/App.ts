@@ -54,10 +54,9 @@ export class App {
       onCreateNote: (content) => this.createNoteWithContent(content),
       onSettingsChange: () => {},
       onConnectDrive: () => {
-        signIn().then(() => {
-          showToast({ message: "Google Drive connected — syncing..." });
+        signIn().then(async () => {
           this.settingsPanel.render();
-          this.syncNow();
+          await this.promptFirstSync();
         }).catch((err) => {
           console.error("Drive sign-in failed:", err);
           showToast({ message: "Failed to connect Google Drive" });
@@ -511,6 +510,81 @@ export class App {
     const parts = [`${notesAdded} note(s)`, `${result.files.length} file(s)`];
     if (result.settings) parts.push("settings");
     showToast({ message: `Imported ${parts.join(", ")}` });
+  }
+
+  private async promptFirstSync(): Promise<void> {
+    const localNotes = await this.db.listActive();
+    const localFiles = await this.images.list();
+    const hasLocalData = localNotes.length > 0 || localFiles.length > 0;
+
+    if (!hasLocalData) {
+      showToast({ message: "Google Drive connected — syncing..." });
+      this.syncNow();
+      return;
+    }
+
+    // Show a dialog asking what to do with local data
+    return new Promise<void>((resolve) => {
+      const backdrop = document.createElement("div");
+      backdrop.className = "first-sync-backdrop";
+
+      const dialog = document.createElement("div");
+      dialog.className = "first-sync-dialog";
+      dialog.innerHTML = `
+        <h3>Google Drive Connected</h3>
+        <p>You have ${localNotes.length} note(s) and ${localFiles.length} file(s) locally. What would you like to do?</p>
+      `;
+
+      const btnUpload = document.createElement("button");
+      btnUpload.className = "first-sync-btn primary";
+      btnUpload.textContent = "Upload local data to Drive";
+      btnUpload.addEventListener("click", () => {
+        backdrop.remove();
+        showToast({ message: "Uploading to Drive..." });
+        this.syncNow();
+        resolve();
+      });
+
+      const btnReplace = document.createElement("button");
+      btnReplace.className = "first-sync-btn danger";
+      btnReplace.textContent = "Clear local & download from Drive";
+      btnReplace.addEventListener("click", async () => {
+        backdrop.remove();
+        showToast({ message: "Clearing local data..." });
+        // Clear all local data
+        const allNotes = await this.db.getAll();
+        for (const n of allNotes) await this.db.hardDelete(n.id);
+        const allFiles = await this.images.list();
+        for (const f of allFiles) await this.images.delete(f);
+        this.activeNoteId = null;
+        this.isDraft = false;
+        // Now sync (pull from Drive)
+        showToast({ message: "Downloading from Drive..." });
+        await this.syncNow();
+        await this.refreshNoteList();
+        if (this.notes.length > 0) {
+          await this.selectNote(this.notes[0].id);
+        } else {
+          await this.createNewNote();
+        }
+        if (this.attachmentsPane.isOpen()) this.attachmentsPane.refresh();
+        resolve();
+      });
+
+      const btnMerge = document.createElement("button");
+      btnMerge.className = "first-sync-btn";
+      btnMerge.textContent = "Merge both (keep everything)";
+      btnMerge.addEventListener("click", () => {
+        backdrop.remove();
+        showToast({ message: "Merging..." });
+        this.syncNow();
+        resolve();
+      });
+
+      dialog.append(btnUpload, btnMerge, btnReplace);
+      backdrop.appendChild(dialog);
+      document.body.appendChild(backdrop);
+    });
   }
 
   private async syncNow(): Promise<void> {

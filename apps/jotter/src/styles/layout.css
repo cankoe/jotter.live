@@ -6,6 +6,82 @@
   height: 100%;
 }
 
+/* ── First Sync Dialog ────────────────────────── */
+
+.first-sync-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.first-sync-dialog {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.first-sync-dialog h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.first-sync-dialog p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.first-sync-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.first-sync-btn:hover {
+  background: var(--bg-hover);
+}
+
+.first-sync-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.first-sync-btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+.first-sync-btn.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.first-sync-btn.danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ── Incognito Banner ────────────────────────── */
+
 .incognito-banner {
   display: flex;
   align-items: center;
