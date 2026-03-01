@@ -508,7 +508,7 @@ export class App {
   }
 
   private async syncNow(): Promise<void> {
-    if (this.isSyncing || !isSignedIn()) return;
+    if (this.isSyncing || !hasToken()) return;
     this.isSyncing = true;
     this.syncBar.show("Syncing...");
     try {
@@ -576,7 +576,7 @@ export class App {
   }
 
   private scheduleDebouncedSync(): void {
-    if (!isSignedIn()) return;
+    if (!hasToken()) return;
     const settings = loadSettings();
     if (!settings.autoSync) return;
     if (this.syncDebounceTimer) clearTimeout(this.syncDebounceTimer);
