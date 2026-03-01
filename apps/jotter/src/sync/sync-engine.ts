@@ -275,9 +275,13 @@ async function deltaSync(
     onProgress?.(msg, Math.min(95, Math.round((done / Math.max(totalWork, 1)) * 100)));
   };
 
-  // 2. Pull remote changes (notes)
+  // 2. Pull remote changes (notes — updated or new)
   for (const change of noteChanges) {
-    if (change.removed || !change.file) continue;
+    if (change.removed || !change.file) {
+      // File was removed from Drive — we'll catch this in the deletion check below
+      progress("Checking removal");
+      continue;
+    }
     const noteId = change.file.name.replace(/\.md$/, "");
     const local = await db.get(noteId);
     const remoteModified = new Date(change.file.modifiedTime).getTime();
@@ -292,9 +296,28 @@ async function deltaSync(
     }
   }
 
-  // 3. Pull remote changes (files)
+  // 2b. Check for notes deleted on Drive (soft-delete locally)
+  const hasRemovals = changes.some((c) => c.removed);
+  if (hasRemovals) {
+    const remoteNoteFiles = await listFiles(folders.notesId);
+    const remoteNoteIds = new Set(remoteNoteFiles.map((f) => f.name.replace(/\.md$/, "")));
+    const localNotes = await db.getAll();
+    for (const note of localNotes) {
+      if (!note.deleted && !remoteNoteIds.has(note.id)) {
+        // Note exists locally but not on Drive — was deleted remotely
+        progress(`Trashing: ${note.title}`);
+        await db.softDelete(note.id);
+        result.notesDeleted++;
+      }
+    }
+  }
+
+  // 3. Pull remote changes (files — updated or new)
   for (const change of fileChanges) {
-    if (change.removed || !change.file) continue;
+    if (change.removed || !change.file) {
+      progress("Checking removal");
+      continue;
+    }
     const name = change.file.name;
     const existing = await imageStore.retrieve(name);
     if (!existing) {
