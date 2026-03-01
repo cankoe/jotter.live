@@ -25,58 +25,30 @@ export interface SyncResult {
 
 type ProgressFn = (message: string, progress: number) => void;
 
-// --- YAML frontmatter helpers ---
+// --- Note helpers ---
 
-function serializeNote(note: Note): string {
-  const frontmatter = [
-    "---",
-    `id: ${note.id}`,
-    `title: ${escapeFrontmatterValue(note.title)}`,
-    `createdAt: ${note.createdAt}`,
-    `updatedAt: ${note.updatedAt}`,
-    `deleted: ${note.deleted}`,
-    `deletedAt: ${note.deletedAt === null ? "null" : note.deletedAt}`,
-    "---",
-  ].join("\n");
-  return `${frontmatter}\n${note.content}`;
+function deriveTitle(content: string): string {
+  return content.split("\n")[0]?.trim() || "Untitled";
 }
 
-function escapeFrontmatterValue(value: string): string {
-  if (/[:#\[\]{}&*!|>'"%@`,?]/.test(value) || value.trim() !== value) {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
-  return value;
-}
-
-function parseNote(text: string): Note | null {
-  const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) return null;
-
-  const [, frontmatter, content] = match;
-  const meta: Record<string, string> = {};
-
-  for (const line of frontmatter.split("\n")) {
-    const colonIdx = line.indexOf(": ");
-    if (colonIdx === -1) continue;
-    const key = line.slice(0, colonIdx).trim();
-    let value = line.slice(colonIdx + 2).trim();
-    if (value.startsWith('"') && value.endsWith('"')) {
-      value = value.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
-    }
-    meta[key] = value;
-  }
-
-  if (!meta.id) return null;
-
+/** Build a Note object from raw markdown content + Drive file metadata */
+function noteFromDrive(content: string, driveFile: DriveFile): Note {
+  const id = driveFile.name.replace(/\.md$/, "");
   return {
-    id: meta.id,
-    title: meta.title || "Untitled",
-    createdAt: parseInt(meta.createdAt, 10) || Date.now(),
-    updatedAt: parseInt(meta.updatedAt, 10) || Date.now(),
-    deleted: meta.deleted === "true",
-    deletedAt: meta.deletedAt === "null" || !meta.deletedAt ? null : parseInt(meta.deletedAt, 10),
+    id,
     content,
+    title: deriveTitle(content),
+    createdAt: new Date(driveFile.createdTime).getTime(),
+    updatedAt: new Date(driveFile.modifiedTime).getTime(),
+    deleted: false,
+    deletedAt: null,
   };
+}
+
+/** Strip frontmatter if present (for backward compatibility with old uploads) */
+function stripFrontmatter(text: string): string {
+  const match = text.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  return match ? match[1] : text;
 }
 
 // --- Parallel execution helper ---
@@ -166,7 +138,7 @@ async function fullSync(
       result.notesDeleted++;
     } else {
       progress(`Uploading: ${note.title}`);
-      await uploadFile(folders.notesId, `${note.id}.md`, serializeNote(note), "text/markdown", remote?.id);
+      await uploadFile(folders.notesId, `${note.id}.md`, note.content, "text/markdown", remote?.id);
       result.notesUploaded++;
     }
   });
@@ -182,8 +154,10 @@ async function fullSync(
   await runParallel(notesToPull, async ([, remote]) => {
     progress(`Downloading: ${remote.name}`);
     const blob = await downloadFile(remote.id);
-    const parsed = parseNote(await blob.text());
-    if (parsed) { await db.put(parsed); result.notesDownloaded++; }
+    const content = stripFrontmatter(await blob.text());
+    const note = noteFromDrive(content, remote);
+    await db.put(note);
+    result.notesDownloaded++;
   });
   done += remoteNoteMap.size - notesToPull.length;
 
@@ -290,8 +264,19 @@ async function deltaSync(
     if (!local || remoteModified > local.updatedAt) {
       progress(`Downloading: ${change.file.name}`);
       const blob = await downloadFile(change.fileId);
-      const parsed = parseNote(await blob.text());
-      if (parsed) { await db.put(parsed); result.notesDownloaded++; }
+      const content = stripFrontmatter(await blob.text());
+      const driveFile: DriveFile = {
+        id: change.fileId,
+        name: change.file.name,
+        mimeType: change.file.mimeType,
+        modifiedTime: change.file.modifiedTime,
+        createdTime: (change.file as any).createdTime || change.file.modifiedTime,
+      };
+      const note = noteFromDrive(content, driveFile);
+      // Preserve local createdAt if note already exists
+      if (local) note.createdAt = local.createdAt;
+      await db.put(note);
+      result.notesDownloaded++;
     } else {
       progress("Up to date");
     }
@@ -364,7 +349,7 @@ async function deltaSync(
         result.notesDeleted++;
       } else if (!note.deleted) {
         progress(`Uploading: ${note.title}`);
-        await uploadFile(folders.notesId, `${note.id}.md`, serializeNote(note), "text/markdown", remote?.id);
+        await uploadFile(folders.notesId, `${note.id}.md`, note.content, "text/markdown", remote?.id);
         result.notesUploaded++;
       }
     });

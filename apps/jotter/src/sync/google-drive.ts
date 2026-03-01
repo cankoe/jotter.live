@@ -8,6 +8,7 @@ export interface DriveFile {
   name: string;
   mimeType: string;
   modifiedTime: string;
+  createdTime: string;
 }
 
 const FOLDER_KEY = "jotter-gdrive-folder";
@@ -117,7 +118,7 @@ export async function listFiles(folderId: string): Promise<DriveFile[]> {
   do {
     const params = new URLSearchParams({
       q: `'${folderId}' in parents and trashed=false`,
-      fields: "nextPageToken,files(id,name,mimeType,modifiedTime)",
+      fields: "nextPageToken,files(id,name,mimeType,modifiedTime,createdTime)",
       spaces: "drive",
       pageSize: "1000",
     });
@@ -240,7 +241,7 @@ export async function getChangesSinceLastSync(): Promise<{
   while (pageToken) {
     const params = new URLSearchParams({
       pageToken,
-      fields: "nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,modifiedTime,parents))",
+      fields: "nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,modifiedTime,createdTime,parents))",
       spaces: "drive",
       includeRemoved: "true",
     });
@@ -258,6 +259,7 @@ export async function getChangesSinceLastSync(): Promise<{
             name: c.file.name,
             mimeType: c.file.mimeType,
             modifiedTime: c.file.modifiedTime,
+            createdTime: c.file.createdTime || c.file.modifiedTime,
           } : undefined,
         });
       }
