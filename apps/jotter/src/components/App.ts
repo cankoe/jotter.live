@@ -459,20 +459,29 @@ export class App {
   }
 
   private async clearAllData(): Promise<void> {
+    // Disconnect Drive first
+    if (hasToken()) {
+      signOut();
+      clearFolderCache();
+    }
+
+    // Clear all notes
     const allNotes = await this.db.getAll();
     for (const note of allNotes) {
       await this.db.hardDelete(note.id);
     }
+
+    // Clear all files
     const allFiles = await this.images.list();
     for (const f of allFiles) {
       await this.images.delete(f);
     }
-    this.activeNoteId = null;
-    this.isDraft = false;
-    await this.refreshNoteList();
-    await this.createNewNote();
-    if (this.attachmentsPane.isOpen()) this.attachmentsPane.refresh();
-    showToast({ message: "All data cleared" });
+
+    // Clear all localStorage
+    localStorage.clear();
+
+    // Reload — shows welcome page fresh
+    window.location.reload();
   }
 
   private async importFullWorkspace(file: File): Promise<void> {
