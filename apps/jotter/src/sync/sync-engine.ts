@@ -330,6 +330,47 @@ async function deltaSync(
     }
   }
 
+  // 3c. Catch any new remote notes/files missed by changes.list
+  // (e.g., created by another device — changes may not include them)
+  onProgress?.("Checking for new remote items...", 60);
+  {
+    const remoteNoteFiles = await listFiles(folders.notesId);
+    for (const remote of remoteNoteFiles) {
+      const noteId = remote.name.replace(/\.md$/, "");
+      const local = await db.get(noteId);
+      if (!local) {
+        progress(`Downloading new: ${remote.name}`);
+        const blob = await downloadFile(remote.id);
+        const content = stripFrontmatter(await blob.text());
+        const note = noteFromDrive(content, remote);
+        await db.put(note);
+        result.notesDownloaded++;
+      } else {
+        const remoteModified = new Date(remote.modifiedTime).getTime();
+        if (remoteModified > local.updatedAt) {
+          progress(`Updating: ${remote.name}`);
+          const blob = await downloadFile(remote.id);
+          const content = stripFrontmatter(await blob.text());
+          const note = noteFromDrive(content, remote);
+          note.createdAt = local.createdAt;
+          await db.put(note);
+          result.notesDownloaded++;
+        }
+      }
+    }
+
+    const remoteFileList = await listFiles(folders.filesId);
+    const localFileNames = new Set(await imageStore.list());
+    for (const remote of remoteFileList) {
+      if (!localFileNames.has(remote.name)) {
+        progress(`Downloading new: ${remote.name}`);
+        const blob = await downloadFile(remote.id);
+        await imageStore.store(blob, remote.name);
+        result.filesDownloaded++;
+      }
+    }
+  }
+
   // 4. Push local changes since last sync
   onProgress?.("Pushing local changes...", 70);
   const lastSync = getLastSyncTime() || 0;
