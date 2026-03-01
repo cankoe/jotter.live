@@ -13,6 +13,7 @@ import {
   hasChangeToken,
   type DriveFile,
 } from "./google-drive";
+import { getDeletedFiles, clearDeletedFiles } from "./deletion-tracker";
 
 export interface SyncResult {
   notesUploaded: number;
@@ -20,6 +21,7 @@ export interface SyncResult {
   notesDeleted: number;
   filesUploaded: number;
   filesDownloaded: number;
+  filesDeleted: number;
 }
 
 type ProgressFn = (message: string, progress: number) => void;
@@ -126,7 +128,7 @@ async function fullSync(
 ): Promise<SyncResult> {
   const result: SyncResult = {
     notesUploaded: 0, notesDownloaded: 0, notesDeleted: 0,
-    filesUploaded: 0, filesDownloaded: 0,
+    filesUploaded: 0, filesDownloaded: 0, filesDeleted: 0,
   };
 
   // Get the start page token BEFORE we start syncing
@@ -195,9 +197,22 @@ async function fullSync(
   });
   done += localFileNames.length - filesToPush.length;
 
-  // Pull files (only missing)
+  // Delete tracked files from Drive
+  const deletedFiles = getDeletedFiles();
+  if (deletedFiles.size > 0) {
+    const filesToDelete = Array.from(deletedFiles).filter((n) => remoteFileMap.has(n));
+    await runParallel(filesToDelete, async (name) => {
+      const remote = remoteFileMap.get(name)!;
+      progress(`Deleting: ${name}`);
+      await deleteFile(remote.id);
+      result.filesDeleted = (result.filesDeleted || 0) + 1;
+    });
+    clearDeletedFiles();
+  }
+
+  // Pull files (only missing, and not in our deleted list)
   const localFileSet = new Set(localFileNames);
-  const filesToPull = Array.from(remoteFileMap.entries()).filter(([n]) => !localFileSet.has(n));
+  const filesToPull = Array.from(remoteFileMap.entries()).filter(([n]) => !localFileSet.has(n) && !deletedFiles.has(n));
   await runParallel(filesToPull, async ([name, remote]) => {
     progress(`Downloading: ${name}`);
     const blob = await downloadFile(remote.id);
@@ -231,7 +246,7 @@ async function deltaSync(
 ): Promise<SyncResult> {
   const result: SyncResult = {
     notesUploaded: 0, notesDownloaded: 0, notesDeleted: 0,
-    filesUploaded: 0, filesDownloaded: 0,
+    filesUploaded: 0, filesDownloaded: 0, filesDeleted: 0,
   };
 
   onProgress?.("Checking for changes...", 10);
@@ -353,6 +368,20 @@ async function deltaSync(
         result.notesUploaded++;
       }
     });
+  }
+
+  // Delete tracked files from Drive
+  const deletedFiles = getDeletedFiles();
+  if (deletedFiles.size > 0) {
+    const remoteFileListForDel = await listFiles(folders.filesId);
+    const remoteFileMapForDel = new Map(remoteFileListForDel.map((f) => [f.name, f]));
+    const filesToDel = Array.from(deletedFiles).filter((n) => remoteFileMapForDel.has(n));
+    await runParallel(filesToDel, async (name) => {
+      progress(`Deleting: ${name}`);
+      await deleteFile(remoteFileMapForDel.get(name)!.id);
+      result.filesDeleted++;
+    });
+    clearDeletedFiles();
   }
 
   // Push new local files

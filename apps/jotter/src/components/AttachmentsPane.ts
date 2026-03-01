@@ -1,4 +1,5 @@
 import type { ImageStore, FileMeta } from "../storage/images";
+import { trackFileDeletion } from "../sync/deletion-tracker";
 
 export interface AttachmentsPaneOptions {
   fileStore: ImageStore;
@@ -134,6 +135,7 @@ export class AttachmentsPane {
   private async deleteSelectedFiles(): Promise<void> {
     for (const filename of this.selectedFiles) {
       await this.options.fileStore.delete(filename);
+      trackFileDeletion(filename);
     }
     this.exitSelectionMode();
     await this.refresh();

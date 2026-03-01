@@ -527,7 +527,8 @@ export class App {
       if (result.notesDownloaded) parts.push(`${result.notesDownloaded} down`);
       if (result.filesUploaded) parts.push(`${result.filesUploaded} files up`);
       if (result.filesDownloaded) parts.push(`${result.filesDownloaded} files down`);
-      if (result.notesDeleted) parts.push(`${result.notesDeleted} deleted`);
+      if (result.notesDeleted) parts.push(`${result.notesDeleted} notes deleted`);
+      if (result.filesDeleted) parts.push(`${result.filesDeleted} files deleted`);
       const summary = parts.length > 0 ? parts.join(", ") : "Already up to date";
       showToast({ message: `Sync complete: ${summary}` });
       this.settingsPanel.render();
