@@ -263,6 +263,12 @@ export class App {
     if (this.landing.isVisible()) {
       this.landing.show();
     }
+
+    // Sync on page load if connected
+    if (hasToken()) {
+      // Small delay to let the UI render first
+      setTimeout(() => this.syncNow(), 500);
+    }
   }
 
   private showLanding(): void {

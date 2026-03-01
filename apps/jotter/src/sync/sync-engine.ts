@@ -1,16 +1,18 @@
 import type { NotesDB, Note } from "../storage/db";
 import type { ImageStore } from "../storage/images";
-import { loadSettings, type SettingsValues } from "../components/Settings";
+import { loadSettings } from "../components/Settings";
 import {
   ensureJotterFolder,
   listFiles,
   uploadFile,
   downloadFile,
   deleteFile,
+  getStartPageToken,
+  getChangesSinceLastSync,
+  storeChangeToken,
+  hasChangeToken,
   type DriveFile,
 } from "./google-drive";
-
-export type SyncDirection = "push" | "pull" | "both";
 
 export interface SyncResult {
   notesUploaded: number;
@@ -19,6 +21,8 @@ export interface SyncResult {
   filesUploaded: number;
   filesDownloaded: number;
 }
+
+type ProgressFn = (message: string, progress: number) => void;
 
 // --- YAML frontmatter helpers ---
 
@@ -37,7 +41,6 @@ function serializeNote(note: Note): string {
 }
 
 function escapeFrontmatterValue(value: string): string {
-  // Wrap in quotes if it contains special YAML characters
   if (/[:#\[\]{}&*!|>'"%@`,?]/.test(value) || value.trim() !== value) {
     return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
@@ -56,7 +59,6 @@ function parseNote(text: string): Note | null {
     if (colonIdx === -1) continue;
     const key = line.slice(0, colonIdx).trim();
     let value = line.slice(colonIdx + 2).trim();
-    // Unescape quoted strings
     if (value.startsWith('"') && value.endsWith('"')) {
       value = value.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
     }
@@ -94,176 +96,268 @@ async function runParallel<T>(
   await Promise.all(workers);
 }
 
-// --- Sync engine ---
+// --- Main sync entry point ---
 
 export async function syncNotes(
   db: NotesDB,
   imageStore: ImageStore,
-  direction: SyncDirection = "both",
-  onProgress?: (message: string, progress: number) => void,
+  _direction: string = "both",
+  onProgress?: ProgressFn,
+): Promise<SyncResult> {
+  onProgress?.("Connecting to Google Drive...", 0);
+  const folders = await ensureJotterFolder();
+
+  // If we have a change token, do a fast delta sync
+  if (hasChangeToken()) {
+    return deltaSync(db, imageStore, folders, onProgress);
+  }
+
+  // First sync — full bidirectional
+  return fullSync(db, imageStore, folders, onProgress);
+}
+
+// --- Full sync (first time or after reset) ---
+
+async function fullSync(
+  db: NotesDB,
+  imageStore: ImageStore,
+  folders: { rootId: string; notesId: string; filesId: string },
+  onProgress?: ProgressFn,
 ): Promise<SyncResult> {
   const result: SyncResult = {
-    notesUploaded: 0,
-    notesDownloaded: 0,
-    notesDeleted: 0,
-    filesUploaded: 0,
-    filesDownloaded: 0,
+    notesUploaded: 0, notesDownloaded: 0, notesDeleted: 0,
+    filesUploaded: 0, filesDownloaded: 0,
   };
 
-  let completed = 0;
-  let totalWork = 0;
+  // Get the start page token BEFORE we start syncing
+  const startToken = await getStartPageToken();
 
-  function report(msg: string): void {
-    if (!onProgress) return;
-    completed++;
-    const pct = totalWork > 0 ? Math.round((completed / totalWork) * 100) : 0;
-    onProgress(msg, Math.min(100, pct));
-  }
+  onProgress?.("Full sync: comparing notes...", 5);
 
-  onProgress?.("Connecting to Google Drive...", 0);
-  const { notesId, filesId, rootId } = await ensureJotterFolder();
-
-  // --- Gather counts for progress ---
-  onProgress?.("Comparing notes...", 0);
   const localNotes = await db.getAll();
-  const remoteNoteFiles = await listFiles(notesId);
-  const remoteNoteMap = new Map<string, DriveFile>();
-  for (const f of remoteNoteFiles) {
-    const id = f.name.replace(/\.md$/, "");
-    remoteNoteMap.set(id, f);
-  }
-  const localNoteMap = new Map<string, Note>();
-  for (const n of localNotes) {
-    localNoteMap.set(n.id, n);
-  }
+  const remoteNoteFiles = await listFiles(folders.notesId);
+  const remoteNoteMap = new Map(remoteNoteFiles.map((f) => [f.name.replace(/\.md$/, ""), f]));
+  const localNoteMap = new Map(localNotes.map((n) => [n.id, n]));
 
   const localFileNames = await imageStore.list();
-  const remoteFileList = await listFiles(filesId);
-  const remoteFileMap = new Map<string, DriveFile>();
-  for (const f of remoteFileList) {
-    remoteFileMap.set(f.name, f);
-  }
+  const remoteFileList = await listFiles(folders.filesId);
+  const remoteFileMap = new Map(remoteFileList.map((f) => [f.name, f]));
 
-  // Count total work items for progress calculation
-  totalWork = localNotes.length + remoteNoteMap.size + localFileNames.length + remoteFileMap.size + 1; // +1 for settings
+  const totalItems = localNotes.length + remoteNoteMap.size + localFileNames.length + remoteFileMap.size + 1;
+  let done = 0;
+  const progress = (msg: string) => {
+    done++;
+    onProgress?.(msg, Math.min(95, Math.round((done / totalItems) * 100)));
+  };
 
-  // --- Push notes (parallel) ---
-  if (direction === "push" || direction === "both") {
-    await runParallel(localNotes, async (note) => {
-      const remote = remoteNoteMap.get(note.id);
-      if (!remote) {
-        if (!note.deleted) {
-          report(`Uploading: ${note.title || "Untitled"}`);
-          await uploadFile(notesId, `${note.id}.md`, serializeNote(note), "text/markdown");
-          result.notesUploaded++;
-        } else {
-          report(`Skipping deleted`);
-        }
-      } else {
-        const remoteModified = new Date(remote.modifiedTime).getTime();
-        if (note.updatedAt > remoteModified) {
-          if (note.deleted && note.deletedAt && note.deletedAt > remoteModified) {
-            report(`Deleting remote: ${note.title || "Untitled"}`);
-            await deleteFile(remote.id);
-            result.notesDeleted++;
-          } else {
-            report(`Updating: ${note.title || "Untitled"}`);
-            await uploadFile(notesId, `${note.id}.md`, serializeNote(note), "text/markdown", remote.id);
-            result.notesUploaded++;
-          }
-        } else {
-          report(`Up to date`);
-        }
-      }
-    });
-  } else {
-    completed += localNotes.length;
-  }
+  // Push notes
+  const notesToPush = localNotes.filter((n) => {
+    const remote = remoteNoteMap.get(n.id);
+    if (!remote) return !n.deleted;
+    return n.updatedAt > new Date(remote.modifiedTime).getTime();
+  });
 
-  // --- Pull notes (parallel) ---
-  if (direction === "pull" || direction === "both") {
-    const remoteEntries = Array.from(remoteNoteMap.entries());
-    await runParallel(remoteEntries, async ([noteId, remote]) => {
-      const local = localNoteMap.get(noteId);
-      const remoteModified = new Date(remote.modifiedTime).getTime();
-      if (!local) {
-        report(`Downloading: ${remote.name}`);
-        const blob = await downloadFile(remote.id);
-        const text = await blob.text();
-        const parsed = parseNote(text);
-        if (parsed) {
-          await db.put(parsed);
-          result.notesDownloaded++;
-        }
-      } else if (direction === "both" && remoteModified > local.updatedAt) {
-        report(`Updating local: ${remote.name}`);
-        const blob = await downloadFile(remote.id);
-        const text = await blob.text();
-        const parsed = parseNote(text);
-        if (parsed) {
-          await db.put(parsed);
-          result.notesDownloaded++;
-        }
-      } else {
-        report(`Up to date`);
-      }
-    });
-  } else {
-    completed += remoteNoteMap.size;
-  }
+  await runParallel(notesToPush, async (note) => {
+    const remote = remoteNoteMap.get(note.id);
+    if (note.deleted && note.deletedAt && remote) {
+      progress(`Deleting: ${note.title}`);
+      await deleteFile(remote.id);
+      result.notesDeleted++;
+    } else {
+      progress(`Uploading: ${note.title}`);
+      await uploadFile(folders.notesId, `${note.id}.md`, serializeNote(note), "text/markdown", remote?.id);
+      result.notesUploaded++;
+    }
+  });
+  done += localNotes.length - notesToPush.length; // count skipped
 
-  // --- Push files (parallel) ---
-  onProgress?.("Syncing files...", (completed / totalWork) * 100);
+  // Pull notes
+  const notesToPull = Array.from(remoteNoteMap.entries()).filter(([id, remote]) => {
+    const local = localNoteMap.get(id);
+    if (!local) return true;
+    return new Date(remote.modifiedTime).getTime() > local.updatedAt;
+  });
 
-  if (direction === "push" || direction === "both") {
-    const filesToUpload = localFileNames.filter((n) => !remoteFileMap.has(n));
-    completed += localFileNames.length - filesToUpload.length; // skip already-synced
-    await runParallel(filesToUpload, async (name) => {
-      report(`Uploading: ${name}`);
-      const blob = await imageStore.retrieve(name);
-      if (blob) {
-        await uploadFile(filesId, name, blob, blob.type || "application/octet-stream");
-        result.filesUploaded++;
-      }
-    });
-  } else {
-    completed += localFileNames.length;
-  }
+  await runParallel(notesToPull, async ([, remote]) => {
+    progress(`Downloading: ${remote.name}`);
+    const blob = await downloadFile(remote.id);
+    const parsed = parseNote(await blob.text());
+    if (parsed) { await db.put(parsed); result.notesDownloaded++; }
+  });
+  done += remoteNoteMap.size - notesToPull.length;
 
-  if (direction === "pull" || direction === "both") {
-    const localFileSet = new Set(localFileNames);
-    const filesToDownload = Array.from(remoteFileMap.entries()).filter(([n]) => !localFileSet.has(n));
-    completed += remoteFileMap.size - filesToDownload.length; // skip already-synced
-    await runParallel(filesToDownload, async ([name, remote]) => {
-      report(`Downloading: ${name}`);
-      const blob = await downloadFile(remote.id);
-      await imageStore.store(blob, name);
-      result.filesDownloaded++;
-    });
-  } else {
-    completed += remoteFileMap.size;
-  }
+  // Push files (only missing)
+  const filesToPush = localFileNames.filter((n) => !remoteFileMap.has(n));
+  await runParallel(filesToPush, async (name) => {
+    progress(`Uploading: ${name}`);
+    const blob = await imageStore.retrieve(name);
+    if (blob) { await uploadFile(folders.filesId, name, blob, blob.type || "application/octet-stream"); result.filesUploaded++; }
+  });
+  done += localFileNames.length - filesToPush.length;
 
-  // --- Upload settings ---
-  if (direction === "push" || direction === "both") {
-    report("Syncing settings...");
-    const settings = loadSettings();
-    const remoteRootFiles = await listFiles(rootId);
-    const existingSettings = remoteRootFiles.find((f) => f.name === "settings.json");
-    await uploadFile(
-      rootId,
-      "settings.json",
-      JSON.stringify(settings, null, 2),
-      "application/json",
-      existingSettings?.id,
-    );
-  } else {
-    report("Skipping settings (pull-only)");
-  }
+  // Pull files (only missing)
+  const localFileSet = new Set(localFileNames);
+  const filesToPull = Array.from(remoteFileMap.entries()).filter(([n]) => !localFileSet.has(n));
+  await runParallel(filesToPull, async ([name, remote]) => {
+    progress(`Downloading: ${name}`);
+    const blob = await downloadFile(remote.id);
+    await imageStore.store(blob, name);
+    result.filesDownloaded++;
+  });
+  done += remoteFileMap.size - filesToPull.length;
 
-  // Store last sync time
+  // Settings
+  onProgress?.("Syncing settings...", 95);
+  const settings = loadSettings();
+  const remoteRootFiles = await listFiles(folders.rootId);
+  const existingSettings = remoteRootFiles.find((f) => f.name === "settings.json");
+  await uploadFile(folders.rootId, "settings.json", JSON.stringify(settings, null, 2), "application/json", existingSettings?.id);
+
+  // Store tokens
+  storeChangeToken(startToken);
   localStorage.setItem("jotter-last-sync", String(Date.now()));
 
+  onProgress?.("Done", 100);
+  return result;
+}
+
+// --- Delta sync (fast, using change tokens) ---
+
+async function deltaSync(
+  db: NotesDB,
+  imageStore: ImageStore,
+  folders: { rootId: string; notesId: string; filesId: string },
+  onProgress?: ProgressFn,
+): Promise<SyncResult> {
+  const result: SyncResult = {
+    notesUploaded: 0, notesDownloaded: 0, notesDeleted: 0,
+    filesUploaded: 0, filesDownloaded: 0,
+  };
+
+  onProgress?.("Checking for changes...", 10);
+
+  // 1. Check what changed on Drive since last sync
+  const changesResult = await getChangesSinceLastSync();
+
+  if (!changesResult) {
+    // No token — fall back to full sync
+    return fullSync(db, imageStore, folders, onProgress);
+  }
+
+  const { changes, newToken } = changesResult;
+
+  // Filter to changes in our Jotter folders
+  const noteChanges: typeof changes = [];
+  const fileChanges: typeof changes = [];
+
+  for (const change of changes) {
+    if (!change.file) {
+      // File was deleted or we can't see it
+      if (change.removed) {
+        noteChanges.push(change); // Could be either — we'll check
+        fileChanges.push(change);
+      }
+      continue;
+    }
+    // Check if file is in our folders (via parents)
+    const file = change.file as DriveFile & { parents?: string[] };
+    if ((file as any).parents?.includes(folders.notesId)) {
+      noteChanges.push(change);
+    } else if ((file as any).parents?.includes(folders.filesId)) {
+      fileChanges.push(change);
+    }
+  }
+
+  const totalWork = noteChanges.length + fileChanges.length + 1; // +1 for local push
+  let done = 0;
+  const progress = (msg: string) => {
+    done++;
+    onProgress?.(msg, Math.min(95, Math.round((done / Math.max(totalWork, 1)) * 100)));
+  };
+
+  // 2. Pull remote changes (notes)
+  for (const change of noteChanges) {
+    if (change.removed || !change.file) continue;
+    const noteId = change.file.name.replace(/\.md$/, "");
+    const local = await db.get(noteId);
+    const remoteModified = new Date(change.file.modifiedTime).getTime();
+
+    if (!local || remoteModified > local.updatedAt) {
+      progress(`Downloading: ${change.file.name}`);
+      const blob = await downloadFile(change.fileId);
+      const parsed = parseNote(await blob.text());
+      if (parsed) { await db.put(parsed); result.notesDownloaded++; }
+    } else {
+      progress("Up to date");
+    }
+  }
+
+  // 3. Pull remote changes (files)
+  for (const change of fileChanges) {
+    if (change.removed || !change.file) continue;
+    const name = change.file.name;
+    const existing = await imageStore.retrieve(name);
+    if (!existing) {
+      progress(`Downloading: ${name}`);
+      const blob = await downloadFile(change.fileId);
+      await imageStore.store(blob, name);
+      result.filesDownloaded++;
+    } else {
+      progress("Up to date");
+    }
+  }
+
+  // 4. Push local changes since last sync
+  onProgress?.("Pushing local changes...", 70);
+  const lastSync = getLastSyncTime() || 0;
+  const localNotes = await db.getAll();
+  const changedNotes = localNotes.filter((n) => n.updatedAt > lastSync);
+
+  if (changedNotes.length > 0) {
+    // Need remote note list to get file IDs for updates
+    const remoteNoteFiles = await listFiles(folders.notesId);
+    const remoteNoteMap = new Map(remoteNoteFiles.map((f) => [f.name.replace(/\.md$/, ""), f]));
+
+    await runParallel(changedNotes, async (note) => {
+      const remote = remoteNoteMap.get(note.id);
+      if (note.deleted && note.deletedAt && remote) {
+        progress(`Deleting: ${note.title}`);
+        await deleteFile(remote.id);
+        result.notesDeleted++;
+      } else if (!note.deleted) {
+        progress(`Uploading: ${note.title}`);
+        await uploadFile(folders.notesId, `${note.id}.md`, serializeNote(note), "text/markdown", remote?.id);
+        result.notesUploaded++;
+      }
+    });
+  }
+
+  // Push new local files
+  const localFileNames = await imageStore.list();
+  const remoteFileList = await listFiles(folders.filesId);
+  const remoteFileSet = new Set(remoteFileList.map((f) => f.name));
+  const newFiles = localFileNames.filter((n) => !remoteFileSet.has(n));
+
+  if (newFiles.length > 0) {
+    await runParallel(newFiles, async (name) => {
+      progress(`Uploading: ${name}`);
+      const blob = await imageStore.retrieve(name);
+      if (blob) { await uploadFile(folders.filesId, name, blob, blob.type || "application/octet-stream"); result.filesUploaded++; }
+    });
+  }
+
+  // Settings
+  onProgress?.("Syncing settings...", 95);
+  const settings = loadSettings();
+  const remoteRootFiles = await listFiles(folders.rootId);
+  const existingSettings = remoteRootFiles.find((f) => f.name === "settings.json");
+  await uploadFile(folders.rootId, "settings.json", JSON.stringify(settings, null, 2), "application/json", existingSettings?.id);
+
+  // Store tokens
+  storeChangeToken(newToken);
+  localStorage.setItem("jotter-last-sync", String(Date.now()));
+
+  onProgress?.("Done", 100);
   return result;
 }
 

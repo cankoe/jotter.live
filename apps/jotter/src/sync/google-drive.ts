@@ -202,4 +202,87 @@ export function clearFolderCache(): void {
   cachedNotesFolderId = null;
   cachedFilesFolderId = null;
   localStorage.removeItem(FOLDER_KEY);
+  localStorage.removeItem("jotter-gdrive-change-token");
+}
+
+// --- Changes API for efficient delta sync ---
+
+export interface DriveChange {
+  fileId: string;
+  removed: boolean;
+  file?: DriveFile;
+}
+
+/**
+ * Get the current start page token for changes tracking.
+ */
+export async function getStartPageToken(): Promise<string> {
+  const resp = await driveRequest(`${DRIVE_API}/changes/startPageToken`);
+  const data = await resp.json();
+  return data.startPageToken;
+}
+
+/**
+ * Get changes since the stored page token.
+ * Returns changed files and a new token.
+ * If no stored token, returns null (caller should do a full sync).
+ */
+export async function getChangesSinceLastSync(): Promise<{
+  changes: DriveChange[];
+  newToken: string;
+} | null> {
+  const storedToken = localStorage.getItem("jotter-gdrive-change-token");
+  if (!storedToken) return null;
+
+  const changes: DriveChange[] = [];
+  let pageToken: string | undefined = storedToken;
+
+  while (pageToken) {
+    const params = new URLSearchParams({
+      pageToken,
+      fields: "nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,modifiedTime,parents))",
+      spaces: "drive",
+      includeRemoved: "true",
+    });
+
+    const resp = await driveRequest(`${DRIVE_API}/changes?${params.toString()}`);
+    const data = await resp.json();
+
+    if (data.changes) {
+      for (const c of data.changes) {
+        changes.push({
+          fileId: c.fileId,
+          removed: c.removed || false,
+          file: c.file ? {
+            id: c.file.id,
+            name: c.file.name,
+            mimeType: c.file.mimeType,
+            modifiedTime: c.file.modifiedTime,
+          } : undefined,
+        });
+      }
+    }
+
+    pageToken = data.nextPageToken;
+    if (data.newStartPageToken) {
+      return { changes, newToken: data.newStartPageToken };
+    }
+  }
+
+  // Should not reach here, but return current token
+  return { changes, newToken: storedToken };
+}
+
+/**
+ * Store the change token for next sync.
+ */
+export function storeChangeToken(token: string): void {
+  localStorage.setItem("jotter-gdrive-change-token", token);
+}
+
+/**
+ * Check if we have a stored change token (i.e., have done at least one full sync).
+ */
+export function hasChangeToken(): boolean {
+  return localStorage.getItem("jotter-gdrive-change-token") !== null;
 }
