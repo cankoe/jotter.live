@@ -5,6 +5,7 @@ import { Sidebar } from "./Sidebar";
 import { EditorPane } from "./EditorPane";
 import { AttachmentsPane } from "./AttachmentsPane";
 import { ResizeHandle } from "./ResizeHandle";
+import { SyncBar } from "./SyncBar";
 import { showToast } from "./Toast";
 import { showContextMenu } from "./ContextMenu";
 import { exportNotesToZip, importFromZip, exportWorkspace, importWorkspace } from "../utils/zip";
@@ -19,6 +20,7 @@ export class App {
   private db: NotesDB;
   private images: ImageStore;
   private topBar: TopBar;
+  private syncBar: SyncBar;
   private sidebar: Sidebar;
   private editorPane: EditorPane;
   private settingsPanel: SettingsPanel;
@@ -83,11 +85,15 @@ export class App {
       onShowSettings: () => this.settingsPanel.toggle(),
     });
 
+    this.syncBar = new SyncBar();
+
     this.sidebar = new Sidebar({
       onNoteSelect: (id) => this.selectNote(id),
       onNoteActionClick: (id, e) => this.showNoteContextMenu(id, e),
       onNewNote: () => this.createNewNote(),
       onTrashClick: () => this.showTrash(),
+      onBulkTrash: (ids) => this.bulkTrashNotes(ids),
+      onBulkExport: (ids) => this.bulkExportNotes(ids),
     });
 
     this.editorPane = new EditorPane({
@@ -107,6 +113,7 @@ export class App {
     this.attachmentsPane = new AttachmentsPane({
       fileStore: this.images,
       onInsertFile: (md) => this.editorPane.insertAtCursor(md),
+      onFilesDeleted: () => this.scheduleDebouncedSync(),
     });
 
     this.overlay = document.createElement("div");
@@ -171,7 +178,7 @@ export class App {
       attachmentsResizeHandle.el,
       this.attachmentsPane.el,
     );
-    appEl.append(this.topBar.el, mainEl, this.overlay);
+    appEl.append(this.topBar.el, this.syncBar.el, mainEl, this.overlay);
     this.root.innerHTML = "";
     this.root.appendChild(appEl);
   }
@@ -503,10 +510,12 @@ export class App {
   private async syncNow(): Promise<void> {
     if (this.isSyncing || !isSignedIn()) return;
     this.isSyncing = true;
+    this.syncBar.show("Syncing...");
     try {
-      const result = await syncNotes(this.db, this.images, "both", (msg) => {
-        showToast({ message: msg, duration: 0 });
+      const result = await syncNotes(this.db, this.images, "both", (msg, progress) => {
+        this.syncBar.update(msg, progress);
       });
+      this.syncBar.hide();
       const parts: string[] = [];
       if (result.notesUploaded) parts.push(`${result.notesUploaded} up`);
       if (result.notesDownloaded) parts.push(`${result.notesDownloaded} down`);
@@ -523,10 +532,47 @@ export class App {
       }
     } catch (err) {
       console.error("Sync failed:", err);
+      this.syncBar.hide();
       showToast({ message: "Sync failed. Check console for details." });
     } finally {
       this.isSyncing = false;
     }
+  }
+
+  private async bulkTrashNotes(ids: string[]): Promise<void> {
+    for (const id of ids) {
+      await this.db.softDelete(id);
+      if (this.activeNoteId === id) {
+        this.activeNoteId = null;
+        this.isDraft = false;
+      }
+    }
+    if (!this.activeNoteId && !this.isDraft) {
+      await this.createNewNote();
+    }
+    await this.refreshNoteList();
+    showToast({ message: `${ids.length} note(s) moved to trash` });
+    this.scheduleDebouncedSync();
+  }
+
+  private async bulkExportNotes(ids: string[]): Promise<void> {
+    const notes: Note[] = [];
+    for (const id of ids) {
+      const note = await this.db.get(id);
+      if (note) notes.push(note);
+    }
+    if (notes.length === 0) {
+      showToast({ message: "No notes to export" });
+      return;
+    }
+    const blob = await exportNotesToZip(notes, this.images);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `jotter-export-${new Date().toISOString().split("T")[0]}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast({ message: `Exported ${notes.length} note(s)` });
   }
 
   private scheduleDebouncedSync(): void {

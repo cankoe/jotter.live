@@ -4,6 +4,7 @@ export interface AttachmentsPaneOptions {
   fileStore: ImageStore;
   onInsertFile: (markdown: string) => void;
   onFileAdded?: (filename: string) => void;
+  onFilesDeleted?: () => void;
 }
 
 function isImageFile(filename: string): boolean {
@@ -48,6 +49,11 @@ export class AttachmentsPane {
   private searchQuery = "";
   private open: boolean;
 
+  private selectionMode = false;
+  private selectedFiles = new Set<string>();
+  private selectBtn: HTMLButtonElement;
+  private selectionBarEl: HTMLElement;
+
   constructor(options: AttachmentsPaneOptions) {
     this.options = options;
     this.open = localStorage.getItem("jotter-files-open") === "1";
@@ -59,12 +65,23 @@ export class AttachmentsPane {
     header.className = "attachments-header";
     const headerTitle = document.createElement("span");
     headerTitle.textContent = "Files";
+
+    this.selectBtn = document.createElement("button");
+    this.selectBtn.className = "attachments-add-btn";
+    this.selectBtn.title = "Select files";
+    this.selectBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
+    this.selectBtn.addEventListener("click", () => this.enterSelectionMode());
+
     const addBtn = document.createElement("button");
     addBtn.className = "attachments-add-btn";
     addBtn.title = "Add file";
     addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
     addBtn.addEventListener("click", () => this.openFilePicker());
-    header.append(headerTitle, addBtn);
+
+    const headerBtns = document.createElement("div");
+    headerBtns.className = "attachments-header-btns";
+    headerBtns.append(this.selectBtn, addBtn);
+    header.append(headerTitle, headerBtns);
 
     // Search
     const searchWrap = document.createElement("div");
@@ -82,7 +99,73 @@ export class AttachmentsPane {
     this.gridEl = document.createElement("div");
     this.gridEl.className = "attachments-grid";
 
-    this.el.append(header, searchWrap, this.gridEl);
+    // Selection bar
+    this.selectionBarEl = document.createElement("div");
+    this.selectionBarEl.className = "attachments-selection-bar";
+    this.selectionBarEl.style.display = "none";
+
+    this.el.append(header, searchWrap, this.gridEl, this.selectionBarEl);
+  }
+
+  private enterSelectionMode(): void {
+    this.selectionMode = true;
+    this.selectedFiles.clear();
+    this.renderGrid();
+    this.renderSelectionBar();
+  }
+
+  private exitSelectionMode(): void {
+    this.selectionMode = false;
+    this.selectedFiles.clear();
+    this.renderGrid();
+    this.renderSelectionBar();
+  }
+
+  private toggleFileSelection(filename: string): void {
+    if (this.selectedFiles.has(filename)) {
+      this.selectedFiles.delete(filename);
+    } else {
+      this.selectedFiles.add(filename);
+    }
+    this.renderGrid();
+    this.renderSelectionBar();
+  }
+
+  private async deleteSelectedFiles(): Promise<void> {
+    for (const filename of this.selectedFiles) {
+      await this.options.fileStore.delete(filename);
+    }
+    this.exitSelectionMode();
+    await this.refresh();
+    this.options.onFilesDeleted?.();
+  }
+
+  private renderSelectionBar(): void {
+    if (!this.selectionMode) {
+      this.selectionBarEl.style.display = "none";
+      this.selectBtn.style.display = "";
+      return;
+    }
+    this.selectBtn.style.display = "none";
+    this.selectionBarEl.style.display = "";
+    this.selectionBarEl.innerHTML = "";
+
+    const countSpan = document.createElement("span");
+    countSpan.className = "attachments-selection-count";
+    countSpan.textContent = `${this.selectedFiles.size} selected`;
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "attachments-selection-btn danger";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.disabled = this.selectedFiles.size === 0;
+    deleteBtn.addEventListener("click", () => this.deleteSelectedFiles());
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "attachments-selection-btn";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => this.exitSelectionMode());
+
+    this.selectionBarEl.append(countSpan, deleteBtn, cancelBtn);
   }
 
   private openFilePicker(): void {
@@ -128,14 +211,24 @@ export class AttachmentsPane {
     for (const meta of filtered) {
       const filename = meta.filename;
       const thumb = document.createElement("div");
-      thumb.className = "attachment-thumb";
-      thumb.title = "Click to insert";
+      thumb.className = `attachment-thumb${this.selectedFiles.has(filename) ? " selected" : ""}`;
+      thumb.title = this.selectionMode ? "Click to select" : "Click to insert";
+
+      // Checkbox overlay in selection mode
+      if (this.selectionMode) {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "attachment-checkbox";
+        checkbox.checked = this.selectedFiles.has(filename);
+        checkbox.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.toggleFileSelection(filename);
+        });
+        thumb.appendChild(checkbox);
+      }
 
       if (isImageFile(filename)) {
         this.loadImageThumb(thumb, filename);
-        thumb.addEventListener("click", () => {
-          this.options.onInsertFile(`![image](jotter-file://${filename})`);
-        });
       } else {
         thumb.classList.add("attachment-file");
         const icon = document.createElement("div");
@@ -145,10 +238,21 @@ export class AttachmentsPane {
         name.className = "attachment-file-name";
         name.textContent = filename;
         thumb.append(icon, name);
-        thumb.addEventListener("click", () => {
-          const ext = filename.split(".").pop() || "";
-          this.options.onInsertFile(`[${ext} file](jotter-file://${filename})`);
-        });
+      }
+
+      if (this.selectionMode) {
+        thumb.addEventListener("click", () => this.toggleFileSelection(filename));
+      } else {
+        if (isImageFile(filename)) {
+          thumb.addEventListener("click", () => {
+            this.options.onInsertFile(`![image](jotter-file://${filename})`);
+          });
+        } else {
+          thumb.addEventListener("click", () => {
+            const ext = filename.split(".").pop() || "";
+            this.options.onInsertFile(`[${ext} file](jotter-file://${filename})`);
+          });
+        }
       }
 
       // Date label
@@ -184,6 +288,7 @@ export class AttachmentsPane {
     this.el.classList.toggle("open", this.open);
     localStorage.setItem("jotter-files-open", this.open ? "1" : "0");
     if (this.open) this.refresh();
+    if (!this.open) this.exitSelectionMode();
   }
 
   /** Call after construction to load files if pane was persisted open */

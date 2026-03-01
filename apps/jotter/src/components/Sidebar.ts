@@ -8,6 +8,8 @@ export interface SidebarOptions {
   onNoteActionClick: (id: string, e: MouseEvent) => void;
   onNewNote: () => void;
   onTrashClick: () => void;
+  onBulkTrash: (ids: string[]) => void;
+  onBulkExport: (ids: string[]) => void;
 }
 
 export class Sidebar {
@@ -25,6 +27,11 @@ export class Sidebar {
   private showDraft = false;
   private searchQuery = "";
   private mode: "notes" | "trash" = "notes";
+
+  private selectionMode = false;
+  private selectedIds = new Set<string>();
+  private selectionBarEl: HTMLElement;
+  private selectBtn: HTMLButtonElement;
 
   constructor(options: SidebarOptions) {
     this.options = options;
@@ -45,7 +52,14 @@ export class Sidebar {
     newBtn.title = "New note";
     newBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
     newBtn.addEventListener("click", options.onNewNote);
-    this.searchWrap.append(this.searchInput, newBtn);
+
+    this.selectBtn = document.createElement("button");
+    this.selectBtn.className = "sidebar-new-btn";
+    this.selectBtn.title = "Select notes";
+    this.selectBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
+    this.selectBtn.addEventListener("click", () => this.enterSelectionMode());
+
+    this.searchWrap.append(this.searchInput, this.selectBtn, newBtn);
 
     this.backEl = document.createElement("div");
     this.backEl.className = "sidebar-back";
@@ -60,7 +74,12 @@ export class Sidebar {
     this.trashEl.className = "sidebar-trash";
     this.trashEl.addEventListener("click", options.onTrashClick);
 
-    this.el.append(this.searchWrap, this.backEl, this.listEl, this.trashEl);
+    // Selection toolbar at the bottom
+    this.selectionBarEl = document.createElement("div");
+    this.selectionBarEl.className = "sidebar-selection-bar";
+    this.selectionBarEl.style.display = "none";
+
+    this.el.append(this.searchWrap, this.backEl, this.listEl, this.trashEl, this.selectionBarEl);
   }
 
   update(notes: Note[], trashedNotes: Note[], activeNoteId: string | null, isDraft = false): void {
@@ -76,6 +95,7 @@ export class Sidebar {
     this.mode = "trash";
     this.searchQuery = "";
     this.searchInput.value = "";
+    this.exitSelectionMode();
     this.render();
   }
 
@@ -83,6 +103,29 @@ export class Sidebar {
     this.mode = "notes";
     this.searchQuery = "";
     this.searchInput.value = "";
+    this.exitSelectionMode();
+    this.render();
+  }
+
+  private enterSelectionMode(): void {
+    if (this.mode !== "notes") return;
+    this.selectionMode = true;
+    this.selectedIds.clear();
+    this.render();
+  }
+
+  private exitSelectionMode(): void {
+    this.selectionMode = false;
+    this.selectedIds.clear();
+    this.render();
+  }
+
+  private toggleNoteSelection(id: string): void {
+    if (this.selectedIds.has(id)) {
+      this.selectedIds.delete(id);
+    } else {
+      this.selectedIds.add(id);
+    }
     this.render();
   }
 
@@ -93,18 +136,21 @@ export class Sidebar {
       this.searchWrap.style.display = "none";
       this.backEl.style.display = "";
       this.trashEl.style.display = "none";
+      this.selectionBarEl.style.display = "none";
       this.renderTrashList();
     } else {
       this.searchWrap.style.display = "";
       this.backEl.style.display = "none";
-      this.trashEl.style.display = "";
+      this.trashEl.style.display = this.selectionMode ? "none" : "";
+      this.selectBtn.style.display = this.selectionMode ? "none" : "";
       this.renderNotesList();
+      this.renderSelectionBar();
     }
   }
 
   private renderNotesList(): void {
     // Ghost note for unsaved draft
-    if (this.showDraft && !this.searchQuery) {
+    if (this.showDraft && !this.searchQuery && !this.selectionMode) {
       const ghost = document.createElement("div");
       ghost.className = "note-item note-item-draft active";
       const content = document.createElement("div");
@@ -133,10 +179,55 @@ export class Sidebar {
           active: note.id === this.activeNoteId,
           onClick: this.options.onNoteSelect,
           onActionClick: this.options.onNoteActionClick,
+          selectionMode: this.selectionMode,
+          selected: this.selectedIds.has(note.id),
+          onToggleSelect: (id) => this.toggleNoteSelection(id),
         }));
       }
     }
     this.trashEl.textContent = `\uD83D\uDDD1 Trash${this.trashCount > 0 ? ` (${this.trashCount})` : ""}`;
+  }
+
+  private renderSelectionBar(): void {
+    if (!this.selectionMode) {
+      this.selectionBarEl.style.display = "none";
+      return;
+    }
+    this.selectionBarEl.style.display = "";
+    this.selectionBarEl.innerHTML = "";
+
+    const countSpan = document.createElement("span");
+    countSpan.className = "sidebar-selection-count";
+    countSpan.textContent = `${this.selectedIds.size} selected`;
+
+    const exportBtn = document.createElement("button");
+    exportBtn.className = "sidebar-selection-btn";
+    exportBtn.textContent = "Export";
+    exportBtn.disabled = this.selectedIds.size === 0;
+    exportBtn.addEventListener("click", () => {
+      if (this.selectedIds.size > 0) {
+        this.options.onBulkExport(Array.from(this.selectedIds));
+        this.exitSelectionMode();
+      }
+    });
+
+    const trashBtn = document.createElement("button");
+    trashBtn.className = "sidebar-selection-btn danger";
+    trashBtn.textContent = "Trash";
+    trashBtn.disabled = this.selectedIds.size === 0;
+    trashBtn.addEventListener("click", () => {
+      if (this.selectedIds.size > 0) {
+        this.options.onBulkTrash(Array.from(this.selectedIds));
+        this.exitSelectionMode();
+      }
+    });
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "sidebar-selection-btn";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => this.exitSelectionMode());
+
+    this.selectionBarEl.append(countSpan, exportBtn, trashBtn, cancelBtn);
   }
 
   private renderTrashList(): void {

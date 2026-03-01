@@ -17,13 +17,29 @@ export interface NoteItemOptions {
   active: boolean;
   onClick: (id: string) => void;
   onActionClick: (id: string, e: MouseEvent) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 export function createNoteItem(options: NoteItemOptions): HTMLElement {
-  const { note, active, onClick, onActionClick } = options;
+  const { note, active, onClick, onActionClick, selectionMode, selected, onToggleSelect } = options;
   const el = document.createElement("div");
-  el.className = `note-item${active ? " active" : ""}`;
+  el.className = `note-item${active ? " active" : ""}${selected ? " selected" : ""}`;
   el.dataset.noteId = note.id;
+
+  // Checkbox for selection mode
+  if (selectionMode) {
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "note-item-checkbox";
+    checkbox.checked = !!selected;
+    checkbox.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onToggleSelect?.(note.id);
+    });
+    el.appendChild(checkbox);
+  }
 
   // Content wrapper
   const content = document.createElement("div");
@@ -59,6 +75,12 @@ export function createNoteItem(options: NoteItemOptions): HTMLElement {
   actions.appendChild(actionBtn);
 
   el.append(content, actions);
-  el.addEventListener("click", () => onClick(note.id));
+
+  if (selectionMode) {
+    el.addEventListener("click", () => onToggleSelect?.(note.id));
+  } else {
+    el.addEventListener("click", () => onClick(note.id));
+  }
+
   return el;
 }
