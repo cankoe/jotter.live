@@ -55,6 +55,7 @@ export class App {
       onSettingsChange: () => {},
       onConnectDrive: () => {
         signIn().then(async () => {
+          this.topBar.setSyncStatus("synced");
           this.settingsPanel.render();
           await this.promptFirstSync();
         }).catch((err) => {
@@ -65,6 +66,7 @@ export class App {
       onDisconnectDrive: () => {
         signOut();
         clearFolderCache();
+        this.topBar.setSyncStatus("hidden");
         this.settingsPanel.render();
       },
       onSyncNow: () => this.syncNow(),
@@ -82,6 +84,7 @@ export class App {
       },
       onShowAbout: () => this.showLanding(),
       onShowSettings: () => this.settingsPanel.toggle(),
+      onSyncClick: () => this.handleSyncClick(),
     });
 
     this.syncBar = new SyncBar();
@@ -266,8 +269,14 @@ export class App {
 
     // Sync on page load if connected
     if (hasToken()) {
-      // Small delay to let the UI render first
-      setTimeout(() => this.syncNow(), 500);
+      if (isSignedIn()) {
+        // Token valid — sync directly
+        this.topBar.setSyncStatus("synced");
+        setTimeout(() => this.syncNow(), 500);
+      } else {
+        // Token expired — show reconnect icon (no popup)
+        this.topBar.setSyncStatus("needs-reconnect");
+      }
     }
   }
 
@@ -633,15 +642,39 @@ export class App {
     });
   }
 
+  /** Handle sync icon click — reconnect if needed, otherwise manual sync */
+  private handleSyncClick(): void {
+    const status = this.topBar.getSyncStatus();
+    if (status === "needs-reconnect") {
+      // User gesture — popup is allowed
+      signIn().then(() => {
+        this.topBar.setSyncStatus("synced");
+        this.settingsPanel.render();
+        this.syncNow();
+      }).catch(() => {
+        showToast({ message: "Sign-in failed or was cancelled" });
+      });
+    } else if (status !== "syncing") {
+      this.syncNow();
+    }
+  }
+
   private async syncNow(): Promise<void> {
     if (this.isSyncing || !hasToken()) return;
+    // Check token validity — if expired, show reconnect icon instead of syncing
+    if (!isSignedIn()) {
+      this.topBar.setSyncStatus("needs-reconnect");
+      return;
+    }
     this.isSyncing = true;
+    this.topBar.setSyncStatus("syncing");
     this.syncBar.show("Syncing...");
     try {
       const result = await syncNotes(this.db, this.images, "both", (msg, progress) => {
         this.syncBar.update(msg, progress);
       });
       this.syncBar.hide();
+      this.topBar.setSyncStatus("synced");
       const parts: string[] = [];
       if (result.notesUploaded) parts.push(`${result.notesUploaded} up`);
       if (result.notesDownloaded) parts.push(`${result.notesDownloaded} down`);
@@ -650,7 +683,7 @@ export class App {
       if (result.notesDeleted) parts.push(`${result.notesDeleted} notes deleted`);
       if (result.filesDeleted) parts.push(`${result.filesDeleted} files deleted`);
       const summary = parts.length > 0 ? parts.join(", ") : "Already up to date";
-      showToast({ message: `Sync complete: ${summary}` });
+      showToast({ message: `Sync: ${summary}` });
       this.settingsPanel.render();
       if (result.notesDownloaded > 0 || result.filesDownloaded > 0) {
         await this.refreshNoteList();
@@ -659,25 +692,12 @@ export class App {
     } catch (err) {
       this.syncBar.hide();
       if (err instanceof Error && err.message === "AUTH_EXPIRED") {
-        // Token expired and silent refresh failed — show reconnect button
-        showToast({
-          message: "Google session expired",
-          action: {
-            label: "Reconnect",
-            onClick: () => {
-              signIn().then(() => {
-                showToast({ message: "Reconnected — syncing..." });
-                this.syncNow();
-              }).catch(() => {
-                showToast({ message: "Sign-in failed or was cancelled" });
-              });
-            },
-          },
-          duration: 0, // Don't auto-dismiss
-        });
+        // Token expired mid-sync — show reconnect icon (no popup, no toast)
+        this.topBar.setSyncStatus("needs-reconnect");
       } else {
         console.error("Sync failed:", err);
-        showToast({ message: "Sync failed. Check console for details." });
+        this.topBar.setSyncStatus("error");
+        showToast({ message: "Sync failed. Click cloud icon to retry." });
       }
     } finally {
       this.isSyncing = false;

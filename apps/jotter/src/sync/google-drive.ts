@@ -17,13 +17,13 @@ let cachedFolderId: string | null = localStorage.getItem(FOLDER_KEY);
 let cachedNotesFolderId: string | null = null;
 let cachedFilesFolderId: string | null = null;
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const token = await getAccessToken();
+function authHeaders(): Record<string, string> {
+  const token = getAccessToken(); // throws AUTH_EXPIRED if expired
   return { Authorization: `Bearer ${token}` };
 }
 
-async function driveRequest(url: string, options: RequestInit = {}, retried = false): Promise<Response> {
-  const headers = await authHeaders();
+async function driveRequest(url: string, options: RequestInit = {}): Promise<Response> {
+  const headers = authHeaders(); // throws AUTH_EXPIRED before even fetching
   const resp = await fetch(url, {
     ...options,
     headers: {
@@ -31,15 +31,10 @@ async function driveRequest(url: string, options: RequestInit = {}, retried = fa
       ...options.headers,
     },
   });
-  if (resp.status === 401 && !retried) {
-    // Token rejected — try silent refresh and retry once
-    const { invalidateToken, refreshTokenSilently } = await import("./google-auth");
+  if (resp.status === 401) {
+    // Token was valid locally but rejected by Google — invalidate and signal
+    const { invalidateToken } = await import("./google-auth");
     invalidateToken();
-    const newToken = await refreshTokenSilently();
-    if (newToken) {
-      return driveRequest(url, options, true);
-    }
-    // Silent refresh failed — signal caller to show reconnect UI
     throw new Error("AUTH_EXPIRED");
   }
   if (!resp.ok) {

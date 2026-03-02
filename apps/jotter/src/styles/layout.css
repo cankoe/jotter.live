@@ -224,6 +224,30 @@
   display: block;
 }
 
+.topbar-sync-btn.hidden { display: none; }
+
+.topbar-sync-btn.synced {
+  color: var(--success, #16a34a);
+}
+
+.topbar-sync-btn.syncing {
+  color: var(--accent);
+  animation: sync-spin 1.5s linear infinite;
+}
+
+.topbar-sync-btn.needs-reconnect {
+  color: #f59e0b;
+}
+
+.topbar-sync-btn.error {
+  color: var(--danger);
+}
+
+@keyframes sync-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ── Main Area ────────────────────────────────── */
 
 .main {
