@@ -685,9 +685,24 @@ export class App {
       const summary = parts.length > 0 ? parts.join(", ") : "Already up to date";
       showToast({ message: `Sync: ${summary}` });
       this.settingsPanel.render();
-      if (result.notesDownloaded > 0 || result.filesDownloaded > 0) {
+      const hasChanges = result.notesDownloaded > 0 || result.notesDeleted > 0
+        || result.filesDownloaded > 0 || result.filesDeleted > 0;
+      if (hasChanges) {
         await this.refreshNoteList();
         if (this.attachmentsPane.isOpen()) this.attachmentsPane.refresh();
+        // If the active note was deleted, switch to a new one
+        if (this.activeNoteId) {
+          const active = await this.db.get(this.activeNoteId);
+          if (!active || active.deleted) {
+            this.activeNoteId = null;
+            this.isDraft = false;
+            if (this.notes.length > 0) {
+              await this.selectNote(this.notes[0].id);
+            } else {
+              await this.createNewNote();
+            }
+          }
+        }
       }
     } catch (err) {
       this.syncBar.hide();
