@@ -32,11 +32,15 @@ async function driveRequest(url: string, options: RequestInit = {}, retried = fa
     },
   });
   if (resp.status === 401 && !retried) {
-    // Token rejected — invalidate cached token, get fresh one, retry
-    const { invalidateToken, signIn } = await import("./google-auth");
+    // Token rejected — try silent refresh and retry once
+    const { invalidateToken, refreshTokenSilently } = await import("./google-auth");
     invalidateToken();
-    await signIn();
-    return driveRequest(url, options, true);
+    const newToken = await refreshTokenSilently();
+    if (newToken) {
+      return driveRequest(url, options, true);
+    }
+    // Silent refresh failed — signal caller to show reconnect UI
+    throw new Error("AUTH_EXPIRED");
   }
   if (!resp.ok) {
     const body = await resp.text();

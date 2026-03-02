@@ -652,15 +652,33 @@ export class App {
       const summary = parts.length > 0 ? parts.join(", ") : "Already up to date";
       showToast({ message: `Sync complete: ${summary}` });
       this.settingsPanel.render();
-      // Refresh the note list in case new notes were pulled
       if (result.notesDownloaded > 0 || result.filesDownloaded > 0) {
         await this.refreshNoteList();
         if (this.attachmentsPane.isOpen()) this.attachmentsPane.refresh();
       }
     } catch (err) {
-      console.error("Sync failed:", err);
       this.syncBar.hide();
-      showToast({ message: "Sync failed. Check console for details." });
+      if (err instanceof Error && err.message === "AUTH_EXPIRED") {
+        // Token expired and silent refresh failed — show reconnect button
+        showToast({
+          message: "Google session expired",
+          action: {
+            label: "Reconnect",
+            onClick: () => {
+              signIn().then(() => {
+                showToast({ message: "Reconnected — syncing..." });
+                this.syncNow();
+              }).catch(() => {
+                showToast({ message: "Sign-in failed or was cancelled" });
+              });
+            },
+          },
+          duration: 0, // Don't auto-dismiss
+        });
+      } else {
+        console.error("Sync failed:", err);
+        showToast({ message: "Sync failed. Check console for details." });
+      }
     } finally {
       this.isSyncing = false;
     }
