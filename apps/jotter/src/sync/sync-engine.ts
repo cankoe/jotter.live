@@ -330,8 +330,9 @@ async function deltaSync(
     }
   }
 
-  // 3c. Catch any new remote notes/files missed by changes.list
-  // (e.g., created by another device — changes may not include them)
+  // 3c. Catch new remote items missed by changes.list
+  // Only downloads items that don't exist locally at all (truly new)
+  // Does NOT re-download items that exist locally — avoids timestamp drift issues
   onProgress?.("Checking for new remote items...", 60);
   {
     const remoteNoteFiles = await listFiles(folders.notesId);
@@ -339,30 +340,22 @@ async function deltaSync(
       const noteId = remote.name.replace(/\.md$/, "");
       const local = await db.get(noteId);
       if (!local) {
+        // Truly new note — not in local DB at all
         progress(`Downloading new: ${remote.name}`);
         const blob = await downloadFile(remote.id);
         const content = stripFrontmatter(await blob.text());
         const note = noteFromDrive(content, remote);
         await db.put(note);
         result.notesDownloaded++;
-      } else {
-        const remoteModified = new Date(remote.modifiedTime).getTime();
-        if (remoteModified > local.updatedAt) {
-          progress(`Updating: ${remote.name}`);
-          const blob = await downloadFile(remote.id);
-          const content = stripFrontmatter(await blob.text());
-          const note = noteFromDrive(content, remote);
-          note.createdAt = local.createdAt;
-          await db.put(note);
-          result.notesDownloaded++;
-        }
       }
+      // Skip existing notes — timestamp comparison handled by changes.list
     }
 
     const remoteFileList = await listFiles(folders.filesId);
     const localFileNames = new Set(await imageStore.list());
     for (const remote of remoteFileList) {
       if (!localFileNames.has(remote.name)) {
+        // Truly new file — not in local storage at all
         progress(`Downloading new: ${remote.name}`);
         const blob = await downloadFile(remote.id);
         await imageStore.store(blob, remote.name);
