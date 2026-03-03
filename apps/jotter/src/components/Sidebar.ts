@@ -43,6 +43,7 @@ export class Sidebar {
     this.searchInput = document.createElement("input");
     this.searchInput.type = "text";
     this.searchInput.placeholder = "Search notes...";
+    this.searchInput.setAttribute("aria-label", "Search notes");
     this.searchInput.addEventListener("input", () => {
       this.searchQuery = this.searchInput.value;
       this.render();

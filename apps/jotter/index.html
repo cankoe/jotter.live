@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="format-detection" content="telephone=no" />
@@ -39,11 +39,12 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet" />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet" /></noscript>
   <style>
     /* Inline critical landing styles so content is visible before JS loads */
     :root {
-      --bg: #ffffff; --text: #1a1a1a; --text-secondary: #666; --text-muted: #999;
+      --bg: #ffffff; --text: #1a1a1a; --text-secondary: #555; --text-muted: #717171;
       --border: #e0e0e0; --accent: #2563eb;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     }

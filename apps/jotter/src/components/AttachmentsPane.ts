@@ -90,6 +90,7 @@ export class AttachmentsPane {
     this.searchInput = document.createElement("input");
     this.searchInput.type = "text";
     this.searchInput.placeholder = "Search files...";
+    this.searchInput.setAttribute("aria-label", "Search files");
     this.searchInput.addEventListener("input", () => {
       this.searchQuery = this.searchInput.value;
       this.renderGrid();
