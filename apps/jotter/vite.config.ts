@@ -34,7 +34,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/\.(xml|txt|json|webmanifest)$/, /^\/icons\//],
+        navigateFallbackDenylist: [/\.(xml|txt|json|webmanifest|html)$/, /^\/icons\//, /^\/(privacy|terms)/],
       },
     }),
   ],
