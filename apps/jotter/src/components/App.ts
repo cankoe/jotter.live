@@ -10,7 +10,7 @@ import { showToast } from "./Toast";
 import { showContextMenu } from "./ContextMenu";
 import { exportNotesToZip, importFromZip, exportWorkspace, importWorkspace } from "../utils/zip";
 import { LandingOverlay } from "./LandingOverlay";
-import { SettingsPanel, loadSettings, saveSettings, applySettings, PRIVACY_POLICY, TERMS_OF_SERVICE } from "./Settings";
+import { SettingsPanel, loadSettings, saveSettings, applySettings } from "./Settings";
 import { createWelcomeNote } from "../welcome";
 import { isSignedIn, hasToken, signIn, signOut } from "../sync/google-auth";
 import { clearFolderCache, getJotterFolderUrl, ensureJotterFolder, listFiles, deleteFile } from "../sync/google-drive";
@@ -51,7 +51,6 @@ export class App {
       onImportWorkspace: (file) => this.importFullWorkspace(file),
       onClearAllData: () => this.clearAllData(),
       onShowWelcome: () => this.showLanding(),
-      onCreateNote: (content) => this.createNoteWithContent(content),
       onSettingsChange: () => {},
       onConnectDrive: () => {
         signIn().then(async () => {
@@ -241,12 +240,7 @@ export class App {
 
     await this.refreshNoteList();
 
-    // Check for /privacy or /terms route
-    const path = window.location.pathname;
-    if (path === "/privacy" || path === "/terms") {
-      const content = path === "/privacy" ? PRIVACY_POLICY : TERMS_OF_SERVICE;
-      await this.createNoteWithContent(content);
-    } else if (!localStorage.getItem("jotter-welcomed") && this.notes.length > 0) {
+    if (!localStorage.getItem("jotter-welcomed") && this.notes.length > 0) {
       // Select the welcome note on first visit
       await this.selectNote(this.notes[0].id);
     } else {

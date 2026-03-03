@@ -173,7 +173,6 @@ export interface SettingsPanelOptions {
   onImportWorkspace: (file: File) => void;
   onClearAllData: () => void;
   onShowWelcome: () => void;
-  onCreateNote: (content: string) => void;
   onSettingsChange: (settings: SettingsValues) => void;
   onConnectDrive: () => void;
   onDisconnectDrive: () => void;
@@ -339,17 +338,9 @@ export class SettingsPanel {
     link.href = href;
     link.textContent = label;
     link.className = "settings-link";
-    if (href.startsWith("http") || href.startsWith("mailto:")) {
+    if (href.startsWith("http") || href.startsWith("mailto:") || href === "/privacy" || href === "/terms") {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-    } else if (href === "/privacy" || href === "/terms") {
-      link.addEventListener("click", (e) => {
-        e.preventDefault();
-        const content = href === "/privacy" ? PRIVACY_POLICY : TERMS_OF_SERVICE;
-        this.options.onCreateNote(content);
-        history.pushState(null, "", href);
-        this.close();
-      });
     }
     row.appendChild(link);
     return row;
@@ -386,24 +377,6 @@ export class SettingsPanel {
     return row;
   }
 
-  private noteLink(label: string, content: string): HTMLElement {
-    const row = document.createElement("div");
-    row.className = "settings-row";
-    const btn = document.createElement("button");
-    btn.className = "settings-link";
-    btn.style.background = "none";
-    btn.style.border = "none";
-    btn.style.cursor = "pointer";
-    btn.style.padding = "0";
-    btn.style.font = "inherit";
-    btn.textContent = label;
-    btn.addEventListener("click", () => {
-      this.options.onCreateNote(content);
-      this.close();
-    });
-    row.appendChild(btn);
-    return row;
-  }
 
   private sectionHeader(text: string): HTMLElement {
     const el = document.createElement("div");
