@@ -25,7 +25,6 @@
     "jszip": "^3.10.1"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
     "fake-indexeddb": "^6.0.0",
     "typescript": "^5.9.3",
     "vite": "^6.2.0",
