@@ -3,6 +3,10 @@ import { groupByDate } from "../utils/dates";
 import { searchNotes } from "../utils/search";
 import { createNoteItem } from "./NoteItem";
 
+const ICON_PLUS = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="3" x2="9" y2="15"/><line x1="3" y1="9" x2="15" y2="9"/></svg>`;
+const ICON_TRASH = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.25 4.5h13.5"/><path d="M6 4.5V3a1.5 1.5 0 011.5-1.5h3A1.5 1.5 0 0112 3v1.5"/><path d="M14.25 4.5v10.5a1.5 1.5 0 01-1.5 1.5h-7.5a1.5 1.5 0 01-1.5-1.5V4.5"/></svg>`;
+const ICON_SETTINGS = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="2.5"/><path d="M14.7 11.1a1.2 1.2 0 00.2 1.3l.04.04a1.44 1.44 0 11-2.04 2.04l-.04-.04a1.2 1.2 0 00-1.3-.2 1.2 1.2 0 00-.72 1.1v.12a1.44 1.44 0 11-2.88 0v-.06a1.2 1.2 0 00-.78-1.1 1.2 1.2 0 00-1.3.2l-.04.04a1.44 1.44 0 11-2.04-2.04l.04-.04a1.2 1.2 0 00.2-1.3 1.2 1.2 0 00-1.1-.72H3.44a1.44 1.44 0 010-2.88h.06a1.2 1.2 0 001.1-.78 1.2 1.2 0 00-.2-1.3l-.04-.04A1.44 1.44 0 116.4 3.32l.04.04a1.2 1.2 0 001.3.2h.06a1.2 1.2 0 00.72-1.1V2.34a1.44 1.44 0 112.88 0v.06a1.2 1.2 0 00.72 1.1 1.2 1.2 0 001.3-.2l.04-.04a1.44 1.44 0 112.04 2.04l-.04.04a1.2 1.2 0 00-.2 1.3v.06a1.2 1.2 0 001.1.72h.12a1.44 1.44 0 010 2.88h-.06a1.2 1.2 0 00-1.1.72z"/></svg>`;
+
 export interface SidebarOptions {
   onNoteSelect: (id: string) => void;
   onNoteActionClick: (id: string, e: MouseEvent) => void;
@@ -10,6 +14,7 @@ export interface SidebarOptions {
   onTrashClick: () => void;
   onBulkTrash: (ids: string[]) => void;
   onBulkExport: (ids: string[]) => void;
+  onShowSettings: () => void;
 }
 
 export class Sidebar {
@@ -17,7 +22,6 @@ export class Sidebar {
   private listEl: HTMLElement;
   private searchWrap: HTMLElement;
   private searchInput: HTMLInputElement;
-  private trashEl: HTMLElement;
   private backEl: HTMLElement;
   private options: SidebarOptions;
   private notes: Note[] = [];
@@ -27,6 +31,7 @@ export class Sidebar {
   private showDraft = false;
   private searchQuery = "";
   private mode: "notes" | "trash" = "notes";
+  private trashBadge: HTMLElement;
 
   private selectionMode = false;
   private selectedIds = new Set<string>();
@@ -38,6 +43,7 @@ export class Sidebar {
     this.el = document.createElement("aside");
     this.el.className = "sidebar";
 
+    // Search bar
     this.searchWrap = document.createElement("div");
     this.searchWrap.className = "sidebar-search";
     this.searchInput = document.createElement("input");
@@ -48,11 +54,6 @@ export class Sidebar {
       this.searchQuery = this.searchInput.value;
       this.render();
     });
-    const newBtn = document.createElement("button");
-    newBtn.className = "sidebar-new-btn";
-    newBtn.title = "New note";
-    newBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
-    newBtn.addEventListener("click", options.onNewNote);
 
     this.selectBtn = document.createElement("button");
     this.selectBtn.className = "sidebar-new-btn";
@@ -60,27 +61,54 @@ export class Sidebar {
     this.selectBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
     this.selectBtn.addEventListener("click", () => this.enterSelectionMode());
 
-    this.searchWrap.append(this.searchInput, this.selectBtn, newBtn);
+    this.searchWrap.append(this.searchInput, this.selectBtn);
 
+    // Back button (for trash view)
     this.backEl = document.createElement("div");
     this.backEl.className = "sidebar-back";
-    this.backEl.textContent = "\u2190 Back to Notes";
+    this.backEl.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg> Back to Notes`;
     this.backEl.addEventListener("click", () => this.showNotes());
     this.backEl.style.display = "none";
 
+    // Notes list
     this.listEl = document.createElement("div");
     this.listEl.className = "sidebar-list";
 
-    this.trashEl = document.createElement("div");
-    this.trashEl.className = "sidebar-trash";
-    this.trashEl.addEventListener("click", options.onTrashClick);
-
-    // Selection toolbar at the bottom
+    // Selection toolbar
     this.selectionBarEl = document.createElement("div");
     this.selectionBarEl.className = "sidebar-selection-bar";
     this.selectionBarEl.style.display = "none";
 
-    this.el.append(this.searchWrap, this.backEl, this.listEl, this.trashEl, this.selectionBarEl);
+    // Bottom action bar (Slack-style: New Note, Trash, Settings)
+    const bottomBar = document.createElement("div");
+    bottomBar.className = "sidebar-bottom-bar";
+
+    const newNoteBtn = this.createBottomBtn(ICON_PLUS, "New Note", () => options.onNewNote());
+    const trashBtn = document.createElement("button");
+    trashBtn.className = "sidebar-bottom-btn";
+    trashBtn.title = "Trash";
+    this.trashBadge = document.createElement("span");
+    this.trashBadge.className = "sidebar-bottom-badge";
+    trashBtn.innerHTML = ICON_TRASH;
+    const trashLabel = document.createElement("span");
+    trashLabel.textContent = "Trash";
+    trashBtn.append(trashLabel, this.trashBadge);
+    trashBtn.addEventListener("click", () => options.onTrashClick());
+
+    const settingsBtn = this.createBottomBtn(ICON_SETTINGS, "Settings", () => options.onShowSettings());
+
+    bottomBar.append(newNoteBtn, trashBtn, settingsBtn);
+
+    this.el.append(this.searchWrap, this.backEl, this.listEl, this.selectionBarEl, bottomBar);
+  }
+
+  private createBottomBtn(iconHtml: string, label: string, onClick: () => void): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.className = "sidebar-bottom-btn";
+    btn.title = label;
+    btn.innerHTML = `${iconHtml}<span>${label}</span>`;
+    btn.addEventListener("click", onClick);
+    return btn;
   }
 
   update(notes: Note[], trashedNotes: Note[], activeNoteId: string | null, isDraft = false): void {
@@ -89,6 +117,8 @@ export class Sidebar {
     this.trashCount = trashedNotes.length;
     this.activeNoteId = activeNoteId;
     this.showDraft = isDraft;
+    this.trashBadge.textContent = this.trashCount > 0 ? String(this.trashCount) : "";
+    this.trashBadge.style.display = this.trashCount > 0 ? "" : "none";
     this.render();
   }
 
@@ -108,7 +138,7 @@ export class Sidebar {
     this.render();
   }
 
-  private enterSelectionMode(): void {
+  enterSelectionMode(): void {
     if (this.mode !== "notes") return;
     this.selectionMode = true;
     this.selectedIds.clear();
@@ -136,13 +166,11 @@ export class Sidebar {
     if (this.mode === "trash") {
       this.searchWrap.style.display = "none";
       this.backEl.style.display = "";
-      this.trashEl.style.display = "none";
       this.selectionBarEl.style.display = "none";
       this.renderTrashList();
     } else {
       this.searchWrap.style.display = "";
       this.backEl.style.display = "none";
-      this.trashEl.style.display = this.selectionMode ? "none" : "";
       this.selectBtn.style.display = this.selectionMode ? "none" : "";
       this.renderNotesList();
       this.renderSelectionBar();
@@ -150,7 +178,6 @@ export class Sidebar {
   }
 
   private renderNotesList(): void {
-    // Ghost note for unsaved draft
     if (this.showDraft && !this.searchQuery && !this.selectionMode) {
       const ghost = document.createElement("div");
       ghost.className = "note-item note-item-draft active";
@@ -183,10 +210,15 @@ export class Sidebar {
           selectionMode: this.selectionMode,
           selected: this.selectedIds.has(note.id),
           onToggleSelect: (id) => this.toggleNoteSelection(id),
+          onLongPress: (id) => {
+            if (!this.selectionMode) {
+              this.enterSelectionMode();
+              this.toggleNoteSelection(id);
+            }
+          },
         }));
       }
     }
-    this.trashEl.textContent = `\uD83D\uDDD1 Trash${this.trashCount > 0 ? ` (${this.trashCount})` : ""}`;
   }
 
   private renderSelectionBar(): void {
@@ -200,6 +232,19 @@ export class Sidebar {
     const countSpan = document.createElement("span");
     countSpan.className = "sidebar-selection-count";
     countSpan.textContent = `${this.selectedIds.size} selected`;
+
+    const selectAllBtn = document.createElement("button");
+    selectAllBtn.className = "sidebar-selection-btn";
+    const allSelected = this.selectedIds.size === this.notes.length && this.notes.length > 0;
+    selectAllBtn.textContent = allSelected ? "Deselect All" : "Select All";
+    selectAllBtn.addEventListener("click", () => {
+      if (allSelected) {
+        this.selectedIds.clear();
+      } else {
+        for (const n of this.notes) this.selectedIds.add(n.id);
+      }
+      this.render();
+    });
 
     const exportBtn = document.createElement("button");
     exportBtn.className = "sidebar-selection-btn";
@@ -225,10 +270,11 @@ export class Sidebar {
 
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "sidebar-selection-btn";
-    cancelBtn.textContent = "Cancel";
+    cancelBtn.textContent = "Done";
+    cancelBtn.style.fontWeight = "600";
     cancelBtn.addEventListener("click", () => this.exitSelectionMode());
 
-    this.selectionBarEl.append(countSpan, exportBtn, trashBtn, cancelBtn);
+    this.selectionBarEl.append(countSpan, selectAllBtn, exportBtn, trashBtn, cancelBtn);
   }
 
   private renderTrashList(): void {
@@ -243,7 +289,7 @@ export class Sidebar {
       this.listEl.appendChild(createNoteItem({
         note,
         active: false,
-        onClick: () => {}, // No selecting trashed notes
+        onClick: () => {},
         onActionClick: this.options.onNoteActionClick,
       }));
     }

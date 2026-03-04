@@ -4,11 +4,21 @@ export interface ContextMenuItem {
   danger?: boolean;
 }
 
-export function showContextMenu(items: ContextMenuItem[], x: number, y: number): void {
-  // Remove any existing context menu
-  const existing = document.querySelector(".context-menu");
-  if (existing) existing.remove();
+const isMobile = () => window.matchMedia("(max-width: 640px)").matches;
 
+export function showContextMenu(items: ContextMenuItem[], x: number, y: number): void {
+  // Remove any existing context menu or action sheet
+  document.querySelector(".context-menu")?.remove();
+  document.querySelector(".action-sheet-backdrop")?.remove();
+
+  if (isMobile()) {
+    showActionSheet(items);
+  } else {
+    showDropdownMenu(items, x, y);
+  }
+}
+
+function showDropdownMenu(items: ContextMenuItem[], x: number, y: number): void {
   const menu = document.createElement("div");
   menu.className = "context-menu";
   menu.style.position = "fixed";
@@ -38,13 +48,43 @@ export function showContextMenu(items: ContextMenuItem[], x: number, y: number):
 
   document.body.appendChild(menu);
 
-  // Close on click outside
   const close = (e: MouseEvent) => {
     if (!menu.contains(e.target as Node)) {
       menu.remove();
       document.removeEventListener("click", close);
     }
   };
-  // Delay to avoid immediate close from the same right-click
   setTimeout(() => document.addEventListener("click", close), 0);
+}
+
+function showActionSheet(items: ContextMenuItem[]): void {
+  const backdrop = document.createElement("div");
+  backdrop.className = "action-sheet-backdrop";
+
+  const sheet = document.createElement("div");
+  sheet.className = "action-sheet";
+
+  for (const item of items) {
+    const btn = document.createElement("button");
+    btn.className = `action-sheet-item${item.danger ? " danger" : ""}`;
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => {
+      item.onClick();
+      backdrop.remove();
+    });
+    sheet.appendChild(btn);
+  }
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "action-sheet-cancel";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", () => backdrop.remove());
+  sheet.appendChild(cancelBtn);
+
+  backdrop.appendChild(sheet);
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) backdrop.remove();
+  });
+
+  document.body.appendChild(backdrop);
 }

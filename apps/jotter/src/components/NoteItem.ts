@@ -20,10 +20,11 @@ export interface NoteItemOptions {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  onLongPress?: (id: string) => void;
 }
 
 export function createNoteItem(options: NoteItemOptions): HTMLElement {
-  const { note, active, onClick, onActionClick, selectionMode, selected, onToggleSelect } = options;
+  const { note, active, onClick, onActionClick, selectionMode, selected, onToggleSelect, onLongPress } = options;
   const el = document.createElement("div");
   el.className = `note-item${active ? " active" : ""}${selected ? " selected" : ""}`;
   el.dataset.noteId = note.id;
@@ -79,6 +80,42 @@ export function createNoteItem(options: NoteItemOptions): HTMLElement {
   if (selectionMode) {
     el.addEventListener("click", () => onToggleSelect?.(note.id));
   } else {
+    // Long-press to enter selection mode (mobile)
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    let longPressed = false;
+
+    if (onLongPress) {
+      el.addEventListener("touchstart", () => {
+        longPressed = false;
+        longPressTimer = setTimeout(() => {
+          longPressed = true;
+          onLongPress(note.id);
+        }, 500);
+      }, { passive: true });
+
+      el.addEventListener("touchmove", () => {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      }, { passive: true });
+
+      el.addEventListener("touchend", () => {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      }, { passive: true });
+    }
+
+    // Tap to select note — use touchend for immediate response on mobile
+    let touchStartY = 0;
+    el.addEventListener("touchstart", (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    el.addEventListener("touchend", (e) => {
+      if (longPressed) { longPressed = false; return; }
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+      if (dy < 10) {
+        e.preventDefault();
+        onClick(note.id);
+      }
+    });
+    // Keep click for mouse/desktop
     el.addEventListener("click", () => onClick(note.id));
   }
 

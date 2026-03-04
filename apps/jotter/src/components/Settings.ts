@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { showToast } from "./Toast";
 
 export const PRIVACY_POLICY = `# Privacy Policy
@@ -301,20 +302,22 @@ export class SettingsPanel {
       () => { this.options.onShowWelcome(); this.close(); }
     ));
 
-    // -- Keyboard shortcuts --
-    body.appendChild(this.sectionHeader("Keyboard Shortcuts"));
-    const shortcuts = [
-      ["New note", "Cmd/Ctrl + N"],
-      ["Search", "Cmd/Ctrl + Shift + F"],
-      ["Export workspace", "Cmd/Ctrl + Shift + E"],
-      ["Bold", "Cmd/Ctrl + B"],
-      ["Italic", "Cmd/Ctrl + I"],
-    ];
-    for (const [action, keys] of shortcuts) {
-      const row = document.createElement("div");
-      row.className = "settings-row";
-      row.innerHTML = `<span>${action}</span><kbd class="settings-kbd">${keys}</kbd>`;
-      body.appendChild(row);
+    // -- Keyboard shortcuts (hidden on native — no physical keyboard) --
+    if (!Capacitor.isNativePlatform()) {
+      body.appendChild(this.sectionHeader("Keyboard Shortcuts"));
+      const shortcuts = [
+        ["New note", "Cmd/Ctrl + N"],
+        ["Search", "Cmd/Ctrl + Shift + F"],
+        ["Export workspace", "Cmd/Ctrl + Shift + E"],
+        ["Bold", "Cmd/Ctrl + B"],
+        ["Italic", "Cmd/Ctrl + I"],
+      ];
+      for (const [action, keys] of shortcuts) {
+        const row = document.createElement("div");
+        row.className = "settings-row";
+        row.innerHTML = `<span>${action}</span><kbd class="settings-kbd">${keys}</kbd>`;
+        body.appendChild(row);
+      }
     }
 
     // -- Support --

@@ -1,0 +1,541 @@
+/* ── Android Native Overrides ─────────────────── */
+/* Scoped under .native-android so web PWA is unaffected */
+
+/* ── Disable hover (no mouse on mobile) ────────── */
+
+.native-android .topbar-btn:hover,
+.native-android .note-item:hover,
+.native-android .sidebar-new-btn:hover,
+.native-android .attachment-thumb:hover,
+.native-android .sidebar-bottom-btn:hover,
+.native-android .editor-toolbar-btn:hover,
+.native-android .first-sync-btn:hover,
+.native-android .attachments-add-btn:hover {
+  background: inherit;
+  color: inherit;
+}
+
+/* ── Tap highlight & active feedback ────────────── */
+
+.native-android {
+  -webkit-tap-highlight-color: rgba(37, 99, 235, 0.12);
+}
+
+.native-android .topbar-btn:active,
+.native-android .sidebar-new-btn:active,
+.native-android .editor-toolbar-btn:active,
+.native-android .attachments-add-btn:active {
+  transform: scale(0.92);
+  opacity: 0.7;
+  transition: transform 0.1s, opacity 0.1s;
+}
+
+.native-android .note-item:active {
+  background: var(--bg-active);
+}
+
+.native-android .first-sync-btn:active,
+.native-android .sidebar-bottom-btn:active,
+.native-android .toast-btn:active,
+.native-android .settings-action-btn:active {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+/* ── Top Bar: taller, bigger targets ────────────── */
+
+.native-android .topbar {
+  height: 56px;
+  padding: 0 8px;
+}
+
+.native-android .topbar-title {
+  font-size: 22px;
+  padding-left: 8px;
+}
+
+.native-android .topbar-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+}
+
+.native-android .topbar-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Sidebar: larger items & controls ───────────── */
+
+.native-android .sidebar-new-btn {
+  width: 40px;
+  height: 40px;
+}
+
+.native-android .sidebar-search input {
+  height: 40px;
+  font-size: 15px;
+  border-radius: 20px;
+  padding: 0 16px;
+}
+
+.native-android .note-item {
+  padding: 12px 16px;
+  min-height: 56px;
+}
+
+.native-android .note-item-title {
+  font-size: 15px;
+}
+
+.native-android .note-item-preview {
+  font-size: 13px;
+}
+
+.native-android .sidebar-bottom-btn {
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+/* ── Editor toolbar: bigger buttons ────────────── */
+
+.native-android .editor-toolbar {
+  padding: 4px 4px;
+  gap: 2px;
+}
+
+.native-android .editor-toolbar-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+}
+
+/* ── Settings panel: bigger rows ─────────────── */
+
+.native-android .settings-row {
+  min-height: 48px;
+}
+
+.native-android .settings-action-btn {
+  min-height: 40px;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+}
+
+/* ── Toast: bigger action button ─────────────── */
+
+.native-android .toast {
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+.native-android .toast-btn {
+  min-height: 36px;
+  padding: 6px 16px;
+  border-radius: 18px;
+}
+
+/* ── Bottom safe area for gesture nav ──────────── */
+
+.native-android .app {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── Smooth transitions for sidebar ────────────── */
+
+.native-android .sidebar {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Selection mode buttons ────────────────────── */
+
+.native-android .sidebar-selection-btn,
+.native-android .attachments-selection-btn {
+  min-height: 36px;
+  border-radius: 18px;
+  padding: 6px 14px;
+}
+
+/* ── Context menu / dialogs: bigger targets ────── */
+
+.native-android .first-sync-btn {
+  min-height: 48px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+
+/* ── Scrollbar: hide on native (touch scroll) ──── */
+
+.native-android ::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   iOS Native Overrides
+   Scoped under .native-ios so web PWA is unaffected.
+   Follows Apple HIG: SF font, 44pt touch targets,
+   grouped list style, subtle separators, no hover.
+   ═══════════════════════════════════════════════════ */
+
+/* ── System font ──────────────────────────────── */
+
+.native-ios {
+  --font-sans: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* ── Disable hover (no mouse on iOS) ──────────── */
+
+.native-ios .topbar-btn:hover,
+.native-ios .note-item:hover,
+.native-ios .sidebar-new-btn:hover,
+.native-ios .attachment-thumb:hover,
+.native-ios .sidebar-bottom-btn:hover,
+.native-ios .editor-toolbar-btn:hover,
+.native-ios .first-sync-btn:hover,
+.native-ios .attachments-add-btn:hover,
+.native-ios .settings-action-btn:hover,
+.native-ios .settings-close-btn:hover,
+.native-ios .settings-coffee:hover,
+.native-ios .settings-link:hover {
+  background: inherit;
+  color: inherit;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── iOS tap feedback (subtle highlight) ─────── */
+
+.native-ios .topbar-btn:active {
+  opacity: 0.5;
+  transition: opacity 0.05s;
+}
+
+.native-ios .note-item:active {
+  background: var(--bg-active);
+}
+
+.native-ios .sidebar-new-btn:active,
+.native-ios .editor-toolbar-btn:active,
+.native-ios .attachments-add-btn:active,
+.native-ios .settings-close-btn:active {
+  opacity: 0.5;
+  transition: opacity 0.05s;
+}
+
+.native-ios .first-sync-btn:active,
+.native-ios .sidebar-bottom-btn:active,
+.native-ios .toast-btn:active,
+.native-ios .settings-action-btn:active,
+.native-ios .settings-link:active,
+.native-ios .settings-coffee:active,
+.native-ios .sidebar-selection-btn:active,
+.native-ios .attachments-selection-btn:active {
+  opacity: 0.5;
+  transition: opacity 0.05s;
+}
+
+/* ── Top Bar: iOS large nav style ─────────────── */
+
+.native-ios .topbar {
+  height: 44px;
+  padding: 0 8px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.native-ios .topbar-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  padding-left: 8px;
+}
+
+.native-ios .topbar-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+}
+
+.native-ios .topbar-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Sidebar: iOS grouped list style ──────────── */
+
+.native-ios .sidebar {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.native-ios .sidebar-new-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  color: var(--accent);
+}
+
+.native-ios .sidebar-search input {
+  height: 36px;
+  font-size: 15px;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--bg-hover);
+  border: none;
+}
+
+.native-ios .sidebar-search input:focus {
+  box-shadow: none;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+}
+
+.native-ios .note-item {
+  padding: 10px 16px;
+  min-height: 52px;
+  border-left: none;
+}
+
+.native-ios .note-item.active {
+  background: var(--bg-active);
+  border-left: none;
+}
+
+.native-ios .note-item-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.native-ios .note-item-preview {
+  font-size: 13px;
+}
+
+.native-ios .note-item-time {
+  font-size: 12px;
+}
+
+.native-ios .sidebar-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.native-ios .sidebar-bottom-bar {
+  border-top: 0.5px solid var(--border);
+}
+
+.native-ios .sidebar-bottom-btn {
+  padding: 10px 16px;
+  font-size: 15px;
+}
+
+/* ── Editor toolbar: iOS-sized ────────────────── */
+
+.native-ios .editor-toolbar {
+  padding: 4px 4px;
+  gap: 0;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.native-ios .editor-toolbar-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+
+.native-ios .editor-toolbar-sep {
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ── Settings panel: iOS style ────────────────── */
+
+.native-ios .settings-panel {
+  border-left: 0.5px solid var(--border);
+}
+
+.native-ios .settings-header {
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--border);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.native-ios .settings-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--bg-hover);
+}
+
+.native-ios .settings-section-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  padding: 20px 16px 6px;
+}
+
+.native-ios .settings-row {
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 15px;
+}
+
+.native-ios .settings-row-action {
+  padding: 10px 16px;
+}
+
+.native-ios .settings-muted {
+  font-size: 13px;
+}
+
+.native-ios .settings-select {
+  font-size: 15px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  border: none;
+}
+
+.native-ios .settings-toggle {
+  width: 50px;
+  height: 30px;
+  border-radius: 15px;
+}
+
+.native-ios .settings-toggle-knob {
+  width: 26px;
+  height: 26px;
+  top: 2px;
+  left: 2px;
+}
+
+.native-ios .settings-toggle.on .settings-toggle-knob {
+  transform: translateX(20px);
+}
+
+.native-ios .settings-action-btn {
+  min-height: 36px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.native-ios .settings-link {
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.native-ios .settings-kbd {
+  display: none;
+}
+
+/* ── Toast: iOS style ─────────────────────────── */
+
+.native-ios .toast {
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+.native-ios .toast-btn {
+  min-height: 32px;
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+/* ── First sync dialog: iOS style ─────────────── */
+
+.native-ios .first-sync-dialog {
+  border-radius: 14px;
+}
+
+.native-ios .first-sync-btn {
+  min-height: 44px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+/* ── Attachments: iOS style ──────────────────── */
+
+.native-ios .attachments-header {
+  border-bottom: 0.5px solid var(--border);
+}
+
+.native-ios .attachment-thumb {
+  border-radius: 10px;
+}
+
+/* ── Selection buttons: iOS style ─────────────── */
+
+.native-ios .sidebar-selection-btn,
+.native-ios .attachments-selection-btn {
+  min-height: 32px;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 14px;
+}
+
+/* ── Thin separators (iOS uses 0.5px hairlines) ── */
+
+.native-ios .sidebar {
+  border-right: 0.5px solid var(--border);
+}
+
+.native-ios .editor-wrap .cm-gutters {
+  border-right: 0.5px solid var(--border);
+}
+
+.native-ios .attachments-pane {
+  border-left: 0.5px solid var(--border);
+}
+
+.native-ios .sidebar-selection-bar,
+.native-ios .attachments-selection-bar {
+  border-top: 0.5px solid var(--border);
+}
+
+/* ── Scrollbar: hide on native (touch scroll) ──── */
+
+.native-ios ::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* ── Rubber-band scrolling ────────────────────── */
+
+.native-ios .sidebar-list,
+.native-ios .settings-body,
+.native-ios .attachments-grid {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Adjust main area for iOS */
+.native-ios .app {
+  padding-bottom: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   Shared Native Overrides (both iOS + Android)
+   ═══════════════════════════════════════════════════ */
+
+/* Eliminate 300ms tap delay and double-tap-to-zoom
+   on all interactive elements */
+.native-android,
+.native-ios {
+  touch-action: manipulation;
+}
+
+.native-android *,
+.native-ios * {
+  touch-action: manipulation;
+}

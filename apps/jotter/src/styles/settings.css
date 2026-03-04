@@ -261,6 +261,80 @@
   white-space: nowrap;
 }
 
+/* ── Mobile Settings ─────────────────────────── */
+
+@media (max-width: 640px) {
+  .settings-panel {
+    width: 100%;
+    border-left: none;
+  }
+
+  .settings-header {
+    padding: 14px 16px;
+    font-size: 16px;
+  }
+
+  .settings-close-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .settings-section-header {
+    padding: 20px 16px 6px;
+    font-size: 12px;
+  }
+
+  .settings-row {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 15px;
+  }
+
+  .settings-row-action {
+    padding: 12px 16px;
+  }
+
+  .settings-muted {
+    font-size: 13px;
+  }
+
+  .settings-select {
+    font-size: 15px;
+    padding: 6px 10px;
+    min-height: 32px;
+  }
+
+  .settings-toggle {
+    width: 46px;
+    height: 28px;
+    border-radius: 14px;
+  }
+
+  .settings-toggle-knob {
+    width: 24px;
+    height: 24px;
+  }
+
+  .settings-toggle.on .settings-toggle-knob {
+    transform: translateX(18px);
+  }
+
+  .settings-action-btn {
+    min-height: 36px;
+    padding: 7px 16px;
+    font-size: 14px;
+  }
+
+  .settings-link {
+    font-size: 15px;
+  }
+
+  .settings-coffee {
+    font-size: 13px;
+    padding: 6px 14px;
+  }
+}
+
 /* Theme override via data-theme */
 [data-theme="light"] {
   --bg: #ffffff;

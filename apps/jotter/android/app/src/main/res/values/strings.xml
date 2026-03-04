@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Jotter</string>
+    <string name="title_activity_main">Jotter</string>
+    <string name="package_name">live.jotter.app</string>
+    <string name="custom_url_scheme">live.jotter.app</string>
+    <string name="server_client_id">669755857434-qvta604cln191dmgqh4pnvb9snd6dvq9.apps.googleusercontent.com</string>
+</resources>

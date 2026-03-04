@@ -21,3 +21,8 @@ coverage/
 # Temp files
 jotter-*.png
 .playwright-mcp/
+
+# Capacitor native platforms (generated, large)
+apps/jotter/ios/App/Pods/
+apps/jotter/android/.gradle/
+apps/jotter/android/app/build/

@@ -1,13 +1,14 @@
 /**
- * Google Identity Services (GIS) OAuth for Google Drive.
+ * Google OAuth for Google Drive — unified web + native.
  *
- * Key rule: requestAccessToken() ALWAYS opens a popup (GIS has no
- * silent/iframe mode). So we NEVER call it without a user gesture.
+ * Web: GIS popup flow (unchanged)
+ * Native (Capacitor iOS/Android): @capawesome/capacitor-google-sign-in
  *
- * - signIn() = user clicks a button → popup → token
- * - getAccessToken() = pure localStorage check → token or AUTH_EXPIRED
- * - No background refresh, no timers, no hidden iframes
+ * Both flows produce the same { access_token, expires_at } in localStorage.
+ * All downstream code (google-drive.ts, sync-engine.ts) is unaffected.
  */
+
+import { Capacitor } from "@capacitor/core";
 
 const CLIENT_ID = "669755857434-qvta604cln191dmgqh4pnvb9snd6dvq9.apps.googleusercontent.com";
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -18,7 +19,7 @@ interface StoredToken {
   expires_at: number;
 }
 
-// --- Token storage ---
+// --- Token storage (shared by both flows) ---
 
 function getStoredToken(): StoredToken | null {
   try {
@@ -39,7 +40,7 @@ function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-// --- GIS token client (singleton) ---
+// --- GIS token client (web only) ---
 
 let tokenClient: google.accounts.oauth2.TokenClient | null = null;
 let resolveAuth: ((token: string) => void) | null = null;
@@ -78,25 +79,7 @@ function getTokenClient(): google.accounts.oauth2.TokenClient {
   return tokenClient;
 }
 
-// --- Public API ---
-
-/** Is the token present AND not expired? */
-export function isSignedIn(): boolean {
-  const token = getStoredToken();
-  return token !== null && Date.now() < token.expires_at;
-}
-
-/** Is there any token stored (possibly expired)? */
-export function hasToken(): boolean {
-  return getStoredToken() !== null;
-}
-
-/**
- * Request a token via GIS popup.
- * ONLY call from user-gesture contexts (button clicks).
- * Concurrent calls share the same promise (singleton).
- */
-export function signIn(): Promise<string> {
+function signInWeb(): Promise<string> {
   if (pendingSignIn) return pendingSignIn;
 
   pendingSignIn = new Promise<string>((resolve, reject) => {
@@ -113,7 +96,7 @@ export function signIn(): Promise<string> {
   return pendingSignIn;
 }
 
-export function signOut(): void {
+function signOutWeb(): void {
   const token = getStoredToken();
   if (token) {
     google.accounts.oauth2.revoke(token.access_token, () => {});
@@ -123,9 +106,78 @@ export function signOut(): void {
   pendingSignIn = null;
 }
 
+// --- Native sign-in (Capacitor plugin) ---
+
+let nativeInitialized = false;
+
+async function ensureNativeInit(): Promise<void> {
+  if (nativeInitialized) return;
+  const { GoogleSignIn } = await import("@capawesome/capacitor-google-sign-in");
+  await GoogleSignIn.initialize({
+    clientId: CLIENT_ID,
+    scopes: [SCOPE],
+  });
+  nativeInitialized = true;
+}
+
+async function signInNative(): Promise<string> {
+  await ensureNativeInit();
+  const { GoogleSignIn } = await import("@capawesome/capacitor-google-sign-in");
+  const result = await GoogleSignIn.signIn();
+
+  if (!result.accessToken) {
+    throw new Error("No access token returned from native sign-in");
+  }
+
+  // Native tokens typically expire in 3600s (1 hour), same as GIS
+  storeToken(result.accessToken, 3600);
+  return result.accessToken;
+}
+
+async function signOutNative(): Promise<void> {
+  try {
+    await ensureNativeInit();
+    const { GoogleSignIn } = await import("@capawesome/capacitor-google-sign-in");
+    await GoogleSignIn.signOut();
+  } catch { /* ignore sign-out errors */ }
+  clearToken();
+}
+
+// --- Public API (unchanged signatures) ---
+
+/** Is the token present AND not expired? */
+export function isSignedIn(): boolean {
+  const token = getStoredToken();
+  return token !== null && Date.now() < token.expires_at;
+}
+
+/** Is there any token stored (possibly expired)? */
+export function hasToken(): boolean {
+  return getStoredToken() !== null;
+}
+
+/**
+ * Request a token via GIS popup (web) or native Google Sign-In (Capacitor).
+ * ONLY call from user-gesture contexts (button clicks).
+ */
+export function signIn(): Promise<string> {
+  if (Capacitor.isNativePlatform()) {
+    return signInNative();
+  }
+  return signInWeb();
+}
+
+export function signOut(): void {
+  if (Capacitor.isNativePlatform()) {
+    signOutNative(); // fire-and-forget async
+  } else {
+    signOutWeb();
+  }
+}
+
 /**
  * Get a valid access token. Pure localStorage check.
- * NEVER calls GIS, NEVER opens a popup.
+ * NEVER opens a popup or triggers sign-in.
  * Throws AUTH_EXPIRED if token is missing or expired.
  */
 export function getAccessToken(): string {

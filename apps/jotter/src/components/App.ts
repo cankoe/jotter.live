@@ -12,6 +12,7 @@ import { exportNotesToZip, importFromZip, exportWorkspace, importWorkspace } fro
 import { LandingOverlay } from "./LandingOverlay";
 import { SettingsPanel, loadSettings, saveSettings, applySettings } from "./Settings";
 import { createWelcomeNote } from "../welcome";
+import { Capacitor } from "@capacitor/core";
 import { isSignedIn, hasToken, signIn, signOut } from "../sync/google-auth";
 import { clearFolderCache, getJotterFolderUrl, ensureJotterFolder, listFiles, deleteFile } from "../sync/google-drive";
 import { syncNotes, getLastSyncTime } from "../sync/sync-engine";
@@ -27,6 +28,7 @@ export class App {
   private attachmentsPane: AttachmentsPane;
   private landing!: LandingOverlay;
   private overlay: HTMLElement;
+  private attachmentsOverlay: HTMLElement;
 
   private activeNoteId: string | null = null;
   private isDraft = false; // true when editing a new unsaved note
@@ -59,7 +61,14 @@ export class App {
           await this.promptFirstSync();
         }).catch((err) => {
           console.error("Drive sign-in failed:", err);
-          showToast({ message: "Failed to connect Google Drive" });
+          if (String(err?.message).includes("No credentials available")) {
+            showToast({
+              message: "No Google account on this device. Add one in Settings > Accounts first.",
+              duration: 8000,
+            });
+          } else {
+            showToast({ message: "Failed to connect Google Drive" });
+          }
         });
       },
       onDisconnectDrive: () => {
@@ -80,6 +89,7 @@ export class App {
       onToggleAttachments: () => {
         this.attachmentsPane.toggle();
         this.topBar.setAttachmentsActive(this.attachmentsPane.isOpen());
+        this.attachmentsOverlay.classList.toggle("open", this.attachmentsPane.isOpen());
       },
       onShowAbout: () => this.showLanding(),
       onShowSettings: () => this.settingsPanel.toggle(),
@@ -95,6 +105,7 @@ export class App {
       onTrashClick: () => this.showTrash(),
       onBulkTrash: (ids) => this.bulkTrashNotes(ids),
       onBulkExport: (ids) => this.bulkExportNotes(ids),
+      onShowSettings: () => this.settingsPanel.toggle(),
     });
 
     this.editorPane = new EditorPane({
@@ -122,8 +133,16 @@ export class App {
     this.overlay.className = "sidebar-overlay";
     this.overlay.addEventListener("click", () => this.toggleSidebar());
 
+    // Attachments overlay — closes attachments pane when tapping outside on mobile
+    this.attachmentsOverlay = document.createElement("div");
+    this.attachmentsOverlay.className = "attachments-overlay";
+    this.attachmentsOverlay.addEventListener("click", () => this.closeAttachments());
+
     // Drag-drop on sidebar for .md/.zip import
     this.setupSidebarDragDrop();
+
+    // Swipe gesture for sidebar on native
+    if (Capacitor.isNativePlatform()) this.setupSwipeGesture();
 
     // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
@@ -180,7 +199,7 @@ export class App {
       attachmentsResizeHandle.el,
       this.attachmentsPane.el,
     );
-    appEl.append(this.topBar.el, mainEl, this.overlay);
+    appEl.append(this.topBar.el, mainEl, this.overlay, this.attachmentsOverlay);
     this.root.innerHTML = "";
     this.root.appendChild(appEl);
   }
@@ -304,6 +323,8 @@ export class App {
     this.isDraft = true;
     this.editorPane.loadNote("");
     this.sidebar.update(this.notes, this.trashedNotes, null, true);
+    this.closeSidebar();
+    this.editorPane.focus();
   }
 
   private async createNoteWithContent(content: string): Promise<void> {
@@ -824,10 +845,50 @@ export class App {
     this.topBar.setSidebarActive(this.sidebarOpen);
   }
 
+  private closeAttachments(): void {
+    if (this.attachmentsPane.isOpen()) {
+      this.attachmentsPane.toggle();
+      this.topBar.setAttachmentsActive(false);
+      this.attachmentsOverlay.classList.remove("open");
+    }
+  }
+
   private closeSidebar(): void {
     this.sidebarOpen = false;
     this.sidebar.setOpen(false);
     this.overlay.classList.toggle("open", false);
     this.topBar.setSidebarActive(false);
+  }
+
+  private setupSwipeGesture(): void {
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    document.addEventListener("touchstart", (e) => {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      // Start tracking if near left edge (open) or sidebar is open (close)
+      tracking = startX < 24 || this.sidebarOpen;
+    }, { passive: true });
+
+    document.addEventListener("touchend", (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - startX;
+      const dy = Math.abs(touch.clientY - startY);
+      // Must be mostly horizontal
+      if (dy > Math.abs(dx)) return;
+      // Swipe right from left edge → open
+      if (!this.sidebarOpen && startX < 24 && dx > 60) {
+        this.toggleSidebar();
+      }
+      // Swipe left on open sidebar → close
+      if (this.sidebarOpen && dx < -60) {
+        this.closeSidebar();
+      }
+    }, { passive: true });
   }
 }

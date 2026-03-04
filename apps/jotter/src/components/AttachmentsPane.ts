@@ -40,10 +40,13 @@ function relativeTime(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
+const isMobile = () => window.matchMedia("(max-width: 640px)").matches;
+
 export class AttachmentsPane {
   readonly el: HTMLElement;
   private gridEl: HTMLElement;
   private searchInput: HTMLInputElement;
+  private uploadAreaEl: HTMLElement;
   private options: AttachmentsPaneOptions;
   private blobUrls: string[] = [];
   private allFiles: FileMeta[] = [];
@@ -61,30 +64,7 @@ export class AttachmentsPane {
     this.el = document.createElement("aside");
     this.el.className = `attachments-pane${this.open ? " open" : ""}`;
 
-    // Header
-    const header = document.createElement("div");
-    header.className = "attachments-header";
-    const headerTitle = document.createElement("span");
-    headerTitle.textContent = "Files";
-
-    this.selectBtn = document.createElement("button");
-    this.selectBtn.className = "attachments-add-btn";
-    this.selectBtn.title = "Select files";
-    this.selectBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
-    this.selectBtn.addEventListener("click", () => this.enterSelectionMode());
-
-    const addBtn = document.createElement("button");
-    addBtn.className = "attachments-add-btn";
-    addBtn.title = "Add file";
-    addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
-    addBtn.addEventListener("click", () => this.openFilePicker());
-
-    const headerBtns = document.createElement("div");
-    headerBtns.className = "attachments-header-btns";
-    headerBtns.append(this.selectBtn, addBtn);
-    header.append(headerTitle, headerBtns);
-
-    // Search
+    // Search bar with select button (matches sidebar pattern)
     const searchWrap = document.createElement("div");
     searchWrap.className = "attachments-search";
     this.searchInput = document.createElement("input");
@@ -95,7 +75,41 @@ export class AttachmentsPane {
       this.searchQuery = this.searchInput.value;
       this.renderGrid();
     });
-    searchWrap.appendChild(this.searchInput);
+
+    this.selectBtn = document.createElement("button");
+    this.selectBtn.className = "sidebar-new-btn";
+    this.selectBtn.title = "Select files";
+    this.selectBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
+    this.selectBtn.addEventListener("click", () => this.enterSelectionMode());
+
+    searchWrap.append(this.searchInput, this.selectBtn);
+
+    // Upload area: drag-drop zone on desktop, button on mobile
+    this.uploadAreaEl = document.createElement("div");
+    this.uploadAreaEl.className = "attachments-upload-area";
+    this.updateUploadArea();
+    this.uploadAreaEl.addEventListener("click", () => this.openFilePicker());
+
+    // Drag-drop on upload area
+    this.uploadAreaEl.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      this.uploadAreaEl.classList.add("drag-over");
+    });
+    this.uploadAreaEl.addEventListener("dragleave", () => {
+      this.uploadAreaEl.classList.remove("drag-over");
+    });
+    this.uploadAreaEl.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      this.uploadAreaEl.classList.remove("drag-over");
+      const files = e.dataTransfer?.files;
+      if (!files) return;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const filename = await this.options.fileStore.store(file, file.name);
+        this.options.onFileAdded?.(filename);
+      }
+      this.refresh();
+    });
 
     // Grid
     this.gridEl = document.createElement("div");
@@ -106,7 +120,17 @@ export class AttachmentsPane {
     this.selectionBarEl.className = "attachments-selection-bar";
     this.selectionBarEl.style.display = "none";
 
-    this.el.append(header, searchWrap, this.gridEl, this.selectionBarEl);
+    this.el.append(searchWrap, this.uploadAreaEl, this.gridEl, this.selectionBarEl);
+  }
+
+  private updateUploadArea(): void {
+    if (isMobile()) {
+      this.uploadAreaEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="3" x2="9" y2="15"/><line x1="3" y1="9" x2="15" y2="9"/></svg> Add Files`;
+      this.uploadAreaEl.classList.add("mobile");
+    } else {
+      this.uploadAreaEl.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Drop files here or click to upload</span>`;
+      this.uploadAreaEl.classList.remove("mobile");
+    }
   }
 
   private enterSelectionMode(): void {
@@ -136,7 +160,6 @@ export class AttachmentsPane {
   private async deleteSelectedFiles(): Promise<void> {
     for (const filename of this.selectedFiles) {
       await this.options.fileStore.delete(filename);
-      // Delete from Drive immediately
       await this.options.onDeleteFile?.(filename);
     }
     this.exitSelectionMode();
@@ -166,7 +189,8 @@ export class AttachmentsPane {
 
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "attachments-selection-btn";
-    cancelBtn.textContent = "Cancel";
+    cancelBtn.textContent = "Done";
+    cancelBtn.style.fontWeight = "600";
     cancelBtn.addEventListener("click", () => this.exitSelectionMode());
 
     this.selectionBarEl.append(countSpan, deleteBtn, cancelBtn);
@@ -190,6 +214,7 @@ export class AttachmentsPane {
 
   async refresh(): Promise<void> {
     this.allFiles = await this.options.fileStore.listWithMeta();
+    this.updateUploadArea();
     this.renderGrid();
   }
 
@@ -218,7 +243,6 @@ export class AttachmentsPane {
       thumb.className = `attachment-thumb${this.selectedFiles.has(filename) ? " selected" : ""}`;
       thumb.title = this.selectionMode ? "Click to select" : "Click to insert";
 
-      // Checkbox overlay in selection mode
       if (this.selectionMode) {
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
@@ -259,7 +283,6 @@ export class AttachmentsPane {
         }
       }
 
-      // Date label
       if (meta.addedAt) {
         const date = document.createElement("div");
         date.className = "attachment-thumb-date";
@@ -295,7 +318,6 @@ export class AttachmentsPane {
     if (!this.open) this.exitSelectionMode();
   }
 
-  /** Call after construction to load files if pane was persisted open */
   initIfOpen(): void {
     if (this.open) this.refresh();
   }
