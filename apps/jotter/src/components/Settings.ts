@@ -328,8 +328,9 @@ export class SettingsPanel {
 
     // -- Legal --
     body.appendChild(this.sectionHeader("Legal"));
-    body.appendChild(this.linkRow("Privacy Policy", "/privacy"));
-    body.appendChild(this.linkRow("Terms of Service", "/terms"));
+    const baseUrl = Capacitor.isNativePlatform() ? "https://jotter.live" : "";
+    body.appendChild(this.linkRow("Privacy Policy", `${baseUrl}/privacy`));
+    body.appendChild(this.linkRow("Terms of Service", `${baseUrl}/terms`));
 
     this.panelEl.append(header, body);
   }
