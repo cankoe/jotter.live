@@ -207,18 +207,22 @@ export class EditorPane {
   toggleLinePrefix(prefix: string): void {
     if (!this.editor) return;
     const view = this.editor.getEditorView();
-    const { from, to } = view.state.selection.main;
+    const { from } = view.state.selection.main;
     const line = view.state.doc.lineAt(from);
+    const cursorOffset = from - line.from; // cursor position within line
 
     if (line.text.startsWith(prefix)) {
-      // Remove prefix
+      // Remove prefix — move cursor back by prefix length
+      const newCursor = Math.max(line.from, from - prefix.length);
       view.dispatch({
         changes: { from: line.from, to: line.from + prefix.length, insert: "" },
+        selection: { anchor: newCursor },
       });
     } else {
-      // Add prefix
+      // Add prefix — move cursor forward by prefix length
       view.dispatch({
         changes: { from: line.from, to: line.from, insert: prefix },
+        selection: { anchor: from + prefix.length },
       });
     }
   }
