@@ -61,7 +61,13 @@ export class Sidebar {
     this.selectBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
     this.selectBtn.addEventListener("click", () => this.enterSelectionMode());
 
-    this.searchWrap.append(this.searchInput, this.selectBtn);
+    const newBtn = document.createElement("button");
+    newBtn.className = "sidebar-new-btn";
+    newBtn.title = "New note";
+    newBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
+    newBtn.addEventListener("click", options.onNewNote);
+
+    this.searchWrap.append(this.searchInput, this.selectBtn, newBtn);
 
     // Back button (for trash view)
     this.backEl = document.createElement("div");
@@ -210,12 +216,6 @@ export class Sidebar {
           selectionMode: this.selectionMode,
           selected: this.selectedIds.has(note.id),
           onToggleSelect: (id) => this.toggleNoteSelection(id),
-          onLongPress: (id) => {
-            if (!this.selectionMode) {
-              this.enterSelectionMode();
-              this.toggleNoteSelection(id);
-            }
-          },
         }));
       }
     }

@@ -20,11 +20,10 @@ export interface NoteItemOptions {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
-  onLongPress?: (id: string) => void;
 }
 
 export function createNoteItem(options: NoteItemOptions): HTMLElement {
-  const { note, active, onClick, onActionClick, selectionMode, selected, onToggleSelect, onLongPress } = options;
+  const { note, active, onClick, onActionClick, selectionMode, selected, onToggleSelect } = options;
   const el = document.createElement("div");
   el.className = `note-item${active ? " active" : ""}${selected ? " selected" : ""}`;
   el.dataset.noteId = note.id;
@@ -80,27 +79,31 @@ export function createNoteItem(options: NoteItemOptions): HTMLElement {
   if (selectionMode) {
     el.addEventListener("click", () => onToggleSelect?.(note.id));
   } else {
-    // Long-press to enter selection mode (mobile)
+    // Long-press shows the note action menu on mobile (replaces three-dot button)
     let longPressTimer: ReturnType<typeof setTimeout> | null = null;
     let longPressed = false;
 
-    if (onLongPress) {
-      el.addEventListener("touchstart", () => {
-        longPressed = false;
-        longPressTimer = setTimeout(() => {
-          longPressed = true;
-          onLongPress(note.id);
-        }, 500);
-      }, { passive: true });
+    el.addEventListener("touchstart", (e) => {
+      longPressed = false;
+      const touch = e.touches[0];
+      longPressTimer = setTimeout(() => {
+        longPressed = true;
+        // Create a synthetic MouseEvent at the touch position for the context menu
+        const syntheticEvent = new MouseEvent("click", {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+        });
+        onActionClick(note.id, syntheticEvent);
+      }, 500);
+    }, { passive: true });
 
-      el.addEventListener("touchmove", () => {
-        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-      }, { passive: true });
+    el.addEventListener("touchmove", () => {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    }, { passive: true });
 
-      el.addEventListener("touchend", () => {
-        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-      }, { passive: true });
-    }
+    el.addEventListener("touchend", () => {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    }, { passive: true });
 
     // Tap to select note — use touchend for immediate response on mobile
     let touchStartY = 0;

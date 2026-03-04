@@ -180,6 +180,26 @@
   flex-shrink: 0;
 }
 
+/* Hidden on desktop — shown on mobile */
+.topbar-menu-btn {
+  display: none;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.topbar-menu-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
 .topbar-title {
   font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
   font-weight: 400;
@@ -1020,6 +1040,10 @@
 /* ── Mobile (max-width: 640px) ────────────────── */
 
 @media (max-width: 640px) {
+  .topbar-menu-btn {
+    display: flex;
+  }
+
   .topbar-title {
     cursor: pointer;
     user-select: none;
@@ -1152,15 +1176,9 @@
     height: 20px;
   }
 
-  /* Always show action dots on mobile (no hover) */
+  /* Hide three-dot menu on mobile — long-press handles actions */
   .note-item-actions {
-    opacity: 1;
-  }
-
-  .note-item-action-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
+    display: none;
   }
 
   /* ── Mobile sidebar bottom bar ─────────────── */
