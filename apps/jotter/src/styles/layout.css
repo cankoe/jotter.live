@@ -458,6 +458,40 @@
   margin-top: 2px;
 }
 
+/* ── New Note Button (full-width, below search) ── */
+
+.sidebar-new-note-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 8px 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sidebar-new-note-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.sidebar-new-note-btn:active {
+  background: var(--bg-active);
+}
+
+.sidebar-new-note-btn svg {
+  flex-shrink: 0;
+}
+
 .sidebar-back {
   display: flex;
   align-items: center;

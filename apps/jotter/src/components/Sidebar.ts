@@ -61,13 +61,13 @@ export class Sidebar {
     this.selectBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
     this.selectBtn.addEventListener("click", () => this.enterSelectionMode());
 
-    const newBtn = document.createElement("button");
-    newBtn.className = "sidebar-new-btn";
-    newBtn.title = "New note";
-    newBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
-    newBtn.addEventListener("click", options.onNewNote);
+    this.searchWrap.append(this.searchInput, this.selectBtn);
 
-    this.searchWrap.append(this.searchInput, this.selectBtn, newBtn);
+    // Full-width "New Note" button below search
+    const newNoteArea = document.createElement("button");
+    newNoteArea.className = "sidebar-new-note-btn";
+    newNoteArea.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="3" x2="9" y2="15"/><line x1="3" y1="9" x2="15" y2="9"/></svg> New Note`;
+    newNoteArea.addEventListener("click", options.onNewNote);
 
     // Back button (for trash view)
     this.backEl = document.createElement("div");
@@ -85,11 +85,10 @@ export class Sidebar {
     this.selectionBarEl.className = "sidebar-selection-bar";
     this.selectionBarEl.style.display = "none";
 
-    // Bottom action bar (Slack-style: New Note, Trash, Settings)
+    // Bottom action bar (Trash + Settings)
     const bottomBar = document.createElement("div");
     bottomBar.className = "sidebar-bottom-bar";
 
-    const newNoteBtn = this.createBottomBtn(ICON_PLUS, "New Note", () => options.onNewNote());
     const trashBtn = document.createElement("button");
     trashBtn.className = "sidebar-bottom-btn";
     trashBtn.title = "Trash";
@@ -103,9 +102,9 @@ export class Sidebar {
 
     const settingsBtn = this.createBottomBtn(ICON_SETTINGS, "Settings", () => options.onShowSettings());
 
-    bottomBar.append(newNoteBtn, trashBtn, settingsBtn);
+    bottomBar.append(trashBtn, settingsBtn);
 
-    this.el.append(this.searchWrap, this.backEl, this.listEl, this.selectionBarEl, bottomBar);
+    this.el.append(this.searchWrap, newNoteArea, this.backEl, this.listEl, this.selectionBarEl, bottomBar);
   }
 
   private createBottomBtn(iconHtml: string, label: string, onClick: () => void): HTMLButtonElement {
